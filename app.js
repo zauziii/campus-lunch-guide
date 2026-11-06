@@ -3,6 +3,7 @@ const API='https://unicafe.fi/wp-json/swiss/v1/restaurants';
 const CACHE='campus-lunch-cn-v2';
 const content=document.querySelector('#content'), status=document.querySelector('#status'), dateNode=document.querySelector('#today'), refreshButton=document.querySelector('#refresh');
 let records=[], translations={}, currentDate='', translating=false, run=0;
+const expandedCampuses=new Set();
 try { translations=JSON.parse(localStorage.getItem(CACHE)||'{}'); } catch {}
 function el(tag,cls,text){const node=document.createElement(tag);if(cls)node.className=cls;if(text!==undefined)node.textContent=text;return node;}
 function setStatus(message, fresh=false){status.replaceChildren();const dot=el('span',fresh?'status-dot ready':'status-dot');status.append(dot,document.createTextNode(' '+message));}
@@ -21,11 +22,22 @@ function render(){
     const list=records.filter(r=>r.campus===campus);
     const meatCount=list.filter(r=>r.dishes.some(d=>d.kind==='meat')).length;
     const fishCount=list.filter(r=>r.dishes.some(d=>d.kind==='fish')).length;
-    const section=el('section','campus');
-    const header=el('div','campus-heading');
+    const section=el('details','campus');
+    section.open=expandedCampuses.has(campus);
+    section.addEventListener('toggle',()=>{
+      if(!section.isConnected)return;
+      if(section.open)expandedCampuses.add(campus);else expandedCampuses.delete(campus);
+    });
+    const header=el('summary','campus-heading');
     header.append(el('h2','campus-title',`${CAMPUS_NAMES[campus]||campus}${campus==='Keskusta'?'校区':''}`));
-    header.append(el('span','campus-summary',`${meatCount} 家有肉 · ${fishCount} 家有鱼`));
-    section.append(header);
+    const meta=el('span','campus-meta');
+    const counts=el('span','campus-summary');
+    const meat=el('span','count');meat.append(el('i','dot meat'),document.createTextNode(`${meatCount} 家有肉`));
+    const fish=el('span','count');fish.append(el('i','dot fish'),document.createTextNode(`${fishCount} 家有鱼`));
+    counts.append(meat,fish);meta.append(counts);
+    if(list.every(r=>!r.dishes.length))meta.append(el('span','missing-summary','暂无菜单'));
+    const arrow=el('span','campus-arrow','⌄');arrow.setAttribute('aria-hidden','true');meta.append(arrow);
+    header.append(meta);section.append(header);
     const table=el('table','menu-table');
     const thead=el('thead');const heading=el('tr');
     for(const label of ['食堂','肉类','鱼 / 海鲜']){const th=el('th','',label);th.scope='col';heading.append(th);}
