@@ -4,6 +4,7 @@ const CACHE='campus-lunch-cn-v2';
 const content=document.querySelector('#content'), status=document.querySelector('#status'), dateNode=document.querySelector('#today'), refreshButton=document.querySelector('#refresh');
 let records=[], translations={}, currentDate='', translating=false, run=0;
 const expandedCampuses=new Set();
+const expandedPending=new Set();
 try { translations=JSON.parse(localStorage.getItem(CACHE)||'{}'); } catch {}
 function el(tag,cls,text){const node=document.createElement(tag);if(cls)node.className=cls;if(text!==undefined)node.textContent=text;return node;}
 function setStatus(message, fresh=false){status.replaceChildren();const dot=el('span',fresh?'status-dot ready':'status-dot');status.append(dot,document.createTextNode(' '+message));}
@@ -14,14 +15,28 @@ function improveTranslation(d, text){
   if (/broiler|chicken|kana/i.test(`${d.original} ${d.enName}`)) text=text.replace(/肉鸡/g,'鸡肉');
   return text;
 }
+function renderDish(dish, kind){
+  const item=el('li','dish');const translated=improveTranslation(dish,translations[key(dish)]);
+  const fallback=dish.enName||dish.original;
+  item.append(el('span','dish-name',translated||(translating?'正在翻译…':fallback)));
+  if(kind==='meat' && dish.meat.status==='identified')item.append(el('span','evidence',`${dish.meat.source}：${dish.meat.term}（${dish.meat.animal}）`));
+  if(kind==='fish'){
+    const labels=[];if(dish.marks.containsFish)labels.push('鱼');if(dish.marks.containsCrustaceans)labels.push('甲壳类');if(dish.marks.containsMolluscs)labels.push('贝类');
+    item.append(el('span','evidence',`官方标记：${labels.join(' / ')}`));
+  }
+  if(translated || translating || (fallback!==dish.original && !translating))item.append(el('span','original',dish.original));
+  if(!translated&&!translating)item.append(el('span','untranslated','中文暂不可用'));
+  return item;
+}
 function render(){
   content.replaceChildren();
   const groups=Object.keys(CAMPUS_NAMES).filter(c=>records.some(r=>r.campus===c));
   for(const group of [...new Set(records.map(x=>x.campus))])if(!groups.includes(group))groups.push(group);
   for(const campus of groups){
     const list=records.filter(r=>r.campus===campus);
-    const meatCount=list.filter(r=>r.dishes.some(d=>d.kind==='meat')).length;
-    const fishCount=list.filter(r=>r.dishes.some(d=>d.kind==='fish')).length;
+    const meatCount=list.filter(r=>r.dishes.some(d=>d.meat.status==='identified')).length;
+    const fishCount=list.filter(r=>r.dishes.some(d=>d.fish)).length;
+    const pendingCount=list.filter(r=>r.dishes.some(d=>d.meat.status==='uncertain')).length;
     const section=el('details','campus');
     section.open=expandedCampuses.has(campus);
     section.addEventListener('toggle',()=>{
@@ -30,19 +45,18 @@ function render(){
     });
     const header=el('summary','campus-heading');
     header.append(el('h2','campus-title',`${CAMPUS_NAMES[campus]||campus}${campus==='Keskusta'?'校区':''}`));
-    const meta=el('span','campus-meta');
-    const counts=el('span','campus-summary');
-    const meat=el('span','count');meat.append(el('i','dot meat'),document.createTextNode(`${meatCount} 家有肉`));
-    const fish=el('span','count');fish.append(el('i','dot fish'),document.createTextNode(`${fishCount} 家有鱼`));
-    counts.append(meat,fish);meta.append(counts);
+    const meta=el('span','campus-meta');const counts=el('span','campus-summary');
+    const meat=el('span','count');meat.append(el('i','dot meat'),document.createTextNode(`${meatCount} 家识别到肉`));
+    const fish=el('span','count');fish.append(el('i','dot fish'),document.createTextNode(`${fishCount} 家鱼 / 海鲜`));
+    counts.append(meat,fish);
+    if(pendingCount)counts.append(el('span','count pending-count',`${pendingCount} 家待确认`));
+    meta.append(counts);
     if(list.every(r=>!r.dishes.length))meta.append(el('span','missing-summary','暂无菜单'));
     const arrow=el('span','campus-arrow','⌄');arrow.setAttribute('aria-hidden','true');meta.append(arrow);
     header.append(meta);section.append(header);
-    const table=el('table','menu-table');
-    const thead=el('thead');const heading=el('tr');
-    for(const label of ['食堂','肉类','鱼 / 海鲜']){const th=el('th','',label);th.scope='col';heading.append(th);}
-    thead.append(heading);table.append(thead);
-    const tbody=el('tbody');
+    const table=el('table','menu-table');const thead=el('thead');const heading=el('tr');
+    for(const label of ['食堂','肉类（已识别）','鱼 / 海鲜（官方标记）']){const th=el('th','',label);th.scope='col';heading.append(th);}
+    thead.append(heading);table.append(thead);const tbody=el('tbody');
     for(const restaurant of list){
       const row=el('tr');const name=el('th','restaurant-name');name.scope='row';
       name.append(el('span','name-text',restaurant.name));
@@ -50,23 +64,22 @@ function render(){
       row.append(name);
       if(!restaurant.dishes.length){const empty=el('td','no-menu','暂无菜单');empty.colSpan=2;row.append(empty);}
       else{
-        for(const kind of ['meat','fish']){
-          const cell=el('td',`dish-cell ${kind}`);const dishes=restaurant.dishes.filter(d=>d.kind===kind);
-          if(!dishes.length)cell.append(el('span','none','没有找到'));
-          else{
-            const listEl=el('ul','dish-list');
-            for(const dish of dishes){
-              const item=el('li','dish');const translated=improveTranslation(dish,translations[key(dish)]);
-              const fallback=dish.enName||dish.original;
-              item.append(el('span','dish-name',translated||(translating?'正在翻译…':fallback)));
-              if(translated || translating || (fallback!==dish.original && !translating)) item.append(el('span','original',dish.original));
-              if(!translated&&!translating)item.append(el('span','untranslated','中文暂不可用'));
-              listEl.append(item);
-            }
-            cell.append(listEl);
-          }
-          row.append(cell);
+        const meatCell=el('td','dish-cell meat');
+        const identified=restaurant.dishes.filter(d=>d.meat.status==='identified');
+        const pending=restaurant.dishes.filter(d=>d.meat.status==='uncertain');
+        if(!identified.length)meatCell.append(el('span','none','未识别到肉'));
+        else{const items=el('ul','dish-list');identified.forEach(d=>items.append(renderDish(d,'meat')));meatCell.append(items);}
+        if(pending.length){
+          const panel=el('details','pending-dishes');panel.open=expandedPending.has(restaurant.slug);
+          panel.addEventListener('toggle',()=>{if(!panel.isConnected)return;if(panel.open)expandedPending.add(restaurant.slug);else expandedPending.delete(restaurant.slug);});
+          panel.append(el('summary','pending-toggle',`${pending.length} 道待确认`));
+          const items=el('ul','dish-list');pending.forEach(d=>items.append(renderDish(d,'pending')));panel.append(items);meatCell.append(panel);
         }
+        row.append(meatCell);
+        const fishCell=el('td','dish-cell fish');const fishDishes=restaurant.dishes.filter(d=>d.fish);
+        if(!fishDishes.length)fishCell.append(el('span','none','未识别到鱼 / 海鲜'));
+        else{const items=el('ul','dish-list');fishDishes.forEach(d=>items.append(renderDish(d,'fish')));fishCell.append(items);}
+        row.append(fishCell);
       }
       tbody.append(row);
     }
@@ -77,7 +90,7 @@ function render(){
 function decode(s){const t=document.createElement('textarea');t.innerHTML=s;return t.value;}
 async function translateAll(version){
   const needed=new Map();
-  for(const r of records)for(const d of r.dishes)if((d.kind==='meat'||d.kind==='fish')&&!translations[key(d)])needed.set(key(d),{text:d.text,language:d.language});
+  for(const r of records)for(const d of r.dishes)if((d.meat.status==='identified'||d.meat.status==='uncertain'||d.fish)&&!translations[key(d)])needed.set(key(d),{text:d.text,language:d.language});
   if(!needed.size)return;
   translating=true;render();
   const batches=[];
