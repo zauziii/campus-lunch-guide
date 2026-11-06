@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f8f9f5">
+  <meta name="description" content="查看赫尔辛基各校区 UniCafe 今日的肉类和鱼类菜单。">
+  <title>Campus Lunch Guide | 今天哪里有肉和鱼？</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" type="module"></script>
+</head>
+<body>
+  <header class="header"><div class="header-inner">
+    <a class="brand" href="#top" aria-label="Campus Lunch Guide 首页"><span class="brand-mark" aria-hidden="true">✳</span><strong>campus lunch<span>.</span></strong></a>
+    <a class="external" href="https://menu.unicafe.fi/" target="_blank" rel="noopener noreferrer">UniCafe 官网 <span aria-hidden="true">↗</span></a>
+  </div></header>
+  <main id="top" class="page">
+    <section class="intro">
+      <div><p class="eyebrow">HELSINKI · UNICAFE</p><h1>今天哪里有肉和鱼<span>？</span></h1><p class="intro-text">一眼看看各校区食堂的今日菜单。</p></div>
+      <div class="date-panel"><span>TODAY</span><strong id="today">正在获取日期…</strong><small>赫尔辛基时间</small></div>
+    </section>
+    <section class="menu-section" aria-label="各校区今日菜单">
+      <div class="toolbar">
+        <div class="live-status" id="status" aria-live="polite"><span class="status-dot"></span> 正在获取官方菜单…</div>
+        <div class="controls"><button id="original-toggle" class="text-button" type="button" aria-pressed="false">显示芬兰语</button><span class="control-divider"></span><button id="refresh" class="text-button" type="button"><span aria-hidden="true">↻</span> 刷新</button></div>
+      </div>
+      <div class="table-key"><span>每个校区内按食堂查看</span><span class="legend"><i class="dot meat"></i>肉类 <i class="dot fish"></i>鱼 / 海鲜</span></div>
+      <div id="content" aria-live="polite"><div class="state"><div class="spinner"></div><h3>正在查看今天的菜单</h3><p>从 UniCafe 获取最新信息…</p></div></div>
+      <div class="notice"><span class="notice-icon">i</span><p>菜名由机器翻译，肉、鱼分类为自动判断，可能有遗漏；“没有找到”不代表可以确认没有该食物。如有过敏或饮食限制，请查看 <a href="https://menu.unicafe.fi/" target="_blank" rel="noopener noreferrer">UniCafe 官方信息 ↗</a>。</p></div>
+    </section>
+  </main>
+  <footer><span><strong>campus lunch<span>.</span></strong> <i>·</i> 好好吃午饭，每一天。</span><span>非官方独立项目 · 数据来源 UniCafe</span></footer>
+</body>
+</html>
