@@ -60,7 +60,7 @@ test('distinguishes meat named in a title from meat only in ingredients',()=>{
   const inIngredients=detectMeat({name:'Carbonara-kastiketta',ingredients:'kerma, pekoni',meta:{}});
   assert.equal(named.source,'菜名');assert.equal(named.animal,'鸡肉');
   assert.equal(inIngredients.source,'配料');assert.equal(inIngredients.animal,'猪肉');
-  assert.equal(detectMeat({name:'Broilerikastike',ingredients:'broileri',meta:{'0':['K']}}).status,'excluded');
+  assert.equal(detectMeat({name:'Broilerikastike',ingredients:'broileri',meta:{'0':['K']}}).status,'identified');
 });
 test('keeps each restaurant associated with its own official address',()=>{
   const input=[

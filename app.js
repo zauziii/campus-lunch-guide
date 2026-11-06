@@ -1,4 +1,4 @@
-import {CAMPUS_NAMES,todayParts,helsinkiMinutes,formatLunchHours,shouldDisplayRestaurant,buildRecords} from './menu.mjs';
+import {CAMPUS_NAMES,todayParts,helsinkiMinutes,formatLunchHours,shouldDisplayRestaurant,emptyMenuState,officialRestaurantUrl,buildRecords} from './menu.mjs';
 import {localDishTranslation,isUsableChineseTranslation,inspectTranslationResponse,translateQueue} from './translation.mjs';
 const API='https://unicafe.fi/wp-json/swiss/v1/restaurants';
 const CACHE='campus-lunch-cn-v2';
@@ -90,10 +90,13 @@ function render(){
     thead.append(heading);table.append(thead);const tbody=el('tbody');
     for(const restaurant of list){
       const row=el('tr');const name=el('th','restaurant-name');name.scope='row';
+      const officialUrl=officialRestaurantUrl(restaurant.slug);
+      const restaurantName=el(officialUrl?'a':'span','name-text restaurant-link',restaurant.name);
+      if(officialUrl){restaurantName.href=officialUrl;restaurantName.target='_blank';restaurantName.rel='noopener noreferrer';restaurantName.setAttribute('aria-label',`${restaurant.name}，在 UniCafe 官网打开`);restaurantName.append(el('span','restaurant-link-icon',' ↗'));}
+      name.append(restaurantName);
       const information=el('details','restaurant-info');information.open=expandedRestaurants.has(restaurant.slug);
       information.addEventListener('toggle',()=>{if(!information.isConnected)return;if(information.open)expandedRestaurants.add(restaurant.slug);else expandedRestaurants.delete(restaurant.slug);});
-      const summary=el('summary','name-text restaurant-info-toggle',restaurant.name);summary.setAttribute('aria-label',`${restaurant.name} 食堂信息`);
-      const infoIcon=el('span','restaurant-info-icon','ⓘ');infoIcon.setAttribute('aria-hidden','true');summary.append(infoIcon);information.append(summary);
+      const summary=el('summary','restaurant-info-toggle','ⓘ');summary.setAttribute('aria-label',`查看 ${restaurant.name} 地址`);information.append(summary);
       const details=el('div','restaurant-info-panel');details.append(el('span','restaurant-address',restaurant.address?`地址：${restaurant.address}`:'地址未提供'));
       information.append(details);name.append(information);
       if(restaurant.staff)name.append(el('span','staff-tag','员工 / 教师'));
@@ -122,7 +125,7 @@ function render(){
     }
     table.append(tbody);section.append(table);content.append(section);
   }
-  if(!groups.length){const empty=el('div','state');empty.append(el('h3','','当前没有可显示的食堂'),el('p','','午餐结束或未找到相关菜品的食堂已隐藏。'));content.append(empty);}
+  if(!groups.length){const result=emptyMenuState(records),empty=el('div','state');empty.append(el('h3','',result.title),el('p','',result.detail));content.append(empty);}
   updateLunchTimes();
 }
 function decode(s){const t=document.createElement('textarea');t.innerHTML=s;return t.value;}

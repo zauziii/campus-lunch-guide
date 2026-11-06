@@ -16,7 +16,10 @@ export function officialMarks(dish) {
   const containsFish=allergens.some(x=>/kala|fish|fisk/i.test(String(x))) || extra.some(x=>/kala/i.test(String(x)));
   const containsCrustaceans=allergens.some(x=>/äyriä|crustacean/i.test(String(x)));
   const containsMolluscs=allergens.some(x=>/nilviä|mollus/i.test(String(x)));
-  return {vegan:flags.includes('VE')||flags.includes('Veg'),vegetarian:flags.includes('K'),containsFish,containsCrustaceans,containsMolluscs};
+  // UniCafe documents Veg as vegan. Do not guess that unlisted abbreviations
+  // such as K or VE have the same meaning as at other food providers.
+  const vegetarian=/^kasvislounas$/i.test(String(dish.price?.name||'').trim());
+  return {vegan:flags.includes('Veg'),vegetarian,containsFish,containsCrustaceans,containsMolluscs};
 }
 export function classifyDish(dish) {
   const marks=officialMarks(dish);
@@ -161,6 +164,30 @@ export function shouldDisplayRestaurant(restaurant,minutes){
   if(hours?.status==='closed')return false;
   if(['regular','exception'].includes(hours?.status)&&Number.isInteger(hours.endMinutes)&&hours.endMinutes>=0&&hours.endMinutes<1440&&Number.isInteger(minutes)&&minutes>=0&&minutes<1440)return minutes<hours.endMinutes;
   return true;
+}
+
+// Called only when the filtered list is empty. Always inspect the complete
+// day's menus so hiding restaurants after lunch cannot imply a vegan day.
+export function emptyMenuState(records){
+  const dishes=(Array.isArray(records)?records:[]).flatMap(r=>Array.isArray(r?.dishes)?r.dishes:[]);
+  if(!dishes.length)return {kind:'no-menu',title:'今天暂无菜单信息',detail:'官方菜单可能尚未更新，或食堂暂停营业。'};
+  if(dishes.some(d=>d?.meat?.status==='identified'||d?.meat?.status==='uncertain'||d?.fish===true))
+    return {kind:'lunch-ended',title:'当前没有可显示的食堂',detail:'相关食堂的午餐时段已结束或暂停营业。'};
+  const isUncertain=d=>!d||d.fish!==false||d.meat?.status!=='excluded';
+  if(dishes.every(d=>!isUncertain(d)&&d.marks?.vegan===true))
+    return {kind:'possible-vegan-day',title:'今天暂未发现肉或鱼',detail:'已获取的菜品均标为纯素，可能是 Vegan Day；请以 UniCafe 官网为准。'};
+  if(dishes.every(d=>!isUncertain(d)&&(d.marks?.vegan===true||d.marks?.vegetarian===true)))
+    return {kind:'vegetarian',title:'今天暂未发现肉或鱼',detail:'已获取的菜品均标为素食，请以 UniCafe 官网为准。'};
+  return {kind:'no-match',title:'今天暂未识别到肉或鱼',detail:'部分菜品或菜单信息尚不完整，请以 UniCafe 官网为准。'};
+}
+
+// The official site's query parameter selects the restaurant. The old
+// /restaurants/... permalink currently redirects to the default restaurant.
+export function officialRestaurantUrl(slug){
+  if(typeof slug!=='string'||! /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug))return '';
+  const url=new URL('https://unicafe.fi/');
+  url.searchParams.set('restaurant',slug);
+  return url.href;
 }
 
 export function buildRecords(fi, en, token, iso=todayParts().iso) {
