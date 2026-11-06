@@ -46,7 +46,7 @@ function render(){
     const header=el('summary','campus-heading');
     header.append(el('h2','campus-title',`${CAMPUS_NAMES[campus]||campus}${campus==='Keskusta'?'校区':''}`));
     const meta=el('span','campus-meta');const counts=el('span','campus-summary');
-    const meat=el('span','count count-meat');meat.append(el('i','dot meat'),el('span','count-label','肉类线索'),el('strong','count-number',`${meatCount} 家`));
+    const meat=el('span','count count-meat');meat.append(el('i','dot meat'),el('span','count-label','肉类'),el('strong','count-number',`${meatCount} 家`));
     const fish=el('span','count count-fish');fish.append(el('i','dot fish'),el('span','count-label','鱼 / 海鲜'),el('strong','count-number',`${fishCount} 家`));
     counts.append(meat,fish);
     if(pendingCount){const pending=el('span','count pending-count');pending.append(el('span','count-label','待确认'),el('strong','count-number',`${pendingCount} 家`));counts.append(pending);}

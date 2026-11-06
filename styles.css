@@ -78,3 +78,34 @@
   .controls{flex-shrink:0}
   .table-key{margin:10px 0 9px}
 }
+
+/* Match the simpler mobile presentation while using the desktop's wider grid. */
+@media(min-width:521px){
+  .intro{padding:32px 0 22px}
+  .intro .eyebrow,.intro .intro-text,.date-panel>span,.table-key .legend{display:none}
+  .date-panel{gap:4px}
+  .date-panel strong{font-size:14px;color:#486850}
+  .date-panel small{font-size:11px;color:#768a79}
+  .toolbar{min-height:51px;padding:4px 0}
+  .live-status{font-size:12px;color:#667e6b}
+  .text-button{font-size:12px;min-height:42px;padding:0 3px;color:#546f5b}
+  .table-key{margin:15px 0 11px;font-size:12px;color:#718575}
+  .campus{border-color:#e1e9df;border-radius:10px;box-shadow:0 3px 12px #314c3408}
+  .campus-heading{display:grid;grid-template-columns:minmax(0,1fr) 26px;grid-template-areas:'title arrow' 'counts counts';gap:10px 4px;padding:16px}
+  .campus-title{grid-area:title;font-size:16px;line-height:1.35}
+  .campus-meta{display:contents}
+  .campus-summary{grid-area:counts;justify-content:flex-start;gap:7px;white-space:normal}
+  .campus-arrow{grid-area:arrow;justify-self:end;align-self:center;font-size:21px;line-height:1;transform:none;color:#718b78}
+  .campus[open] .campus-arrow{transform:rotate(180deg)}
+  .missing-summary{grid-column:1 / -1;font-size:11px;color:#6d7d70}
+  .count{min-height:30px;gap:5px;border-radius:6px;padding:5px 7px;font-size:12px;line-height:1.4;white-space:nowrap}
+  .count-meat{background:#fbefe4;color:#815334}
+  .count-fish{background:#e9f3f5;color:#456f7e}
+  .pending-count{background:#f0f3ef;color:#617064;font-size:12px}
+  .count-number{font-size:12px;line-height:1;color:inherit}
+  .campus-summary .dot{width:7px;height:7px}
+  .menu-table{font-size:13px}
+  .menu-table thead th{font-size:11px}
+  .restaurant-name{font-size:13px}
+  .lunch-hours,.evidence,.original,.untranslated,.none,.no-menu{font-size:11px}
+}
