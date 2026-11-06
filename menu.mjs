@@ -75,7 +75,73 @@ export function detectMeat(dish) {
   return {status:orange?'uncertain':'excluded',reason:orange?'没有明确肉类线索':'其他菜单类别'};
 }
 
-export function buildRecords(fi, en, token) {
+const WEEKDAYS=['ma','ti','ke','to','pe','la','su'];
+function validMonthDay(day,month) {
+  const d=new Date(Date.UTC(2024,month-1,day));
+  return month>=1&&month<=12&&day>=1&&d.getUTCMonth()===month-1&&d.getUTCDate()===day;
+}
+// The API currently gives exception dates without a year, e.g. 28.10 and
+// 19.-24.10. Return null for formats we cannot interpret safely.
+function matchesException(label,iso) {
+  const value=String(label||'').replace(/\s/g,'');
+  const [year,month,day]=iso.split('-').map(Number);
+  let m=value.match(/^(\d{1,2})\.(\d{1,2})\.?$/);
+  if(m){const d=+m[1],mo=+m[2];return validMonthDay(d,mo)?day===d&&month===mo:null;}
+  m=value.match(/^(\d{1,2})\.?(?:-|–|—)(\d{1,2})\.(\d{1,2})\.?$/);
+  if(m){const start=+m[1],end=+m[2],mo=+m[3];return validMonthDay(start,mo)&&validMonthDay(end,mo)&&start<=end?month===mo&&day>=start&&day<=end:null;}
+  m=value.match(/^(\d{1,2})\.(\d{1,2})\.?(?:-|–|—)(\d{1,2})\.(\d{1,2})\.?$/);
+  if(m){
+    const startDay=+m[1],startMonth=+m[2],endDay=+m[3],endMonth=+m[4];
+    if(!validMonthDay(startDay,startMonth)||!validMonthDay(endDay,endMonth))return null;
+    const today=Date.UTC(year,month-1,day);
+    for(const startYear of [year-1,year,year+1]){
+      const start=Date.UTC(startYear,startMonth-1,startDay);
+      const crossesYear=endMonth<startMonth||(endMonth===startMonth&&endDay<startDay);
+      const end=Date.UTC(startYear+(crossesYear?1:0),endMonth-1,endDay);
+      if(today>=start&&today<=end)return true;
+    }
+    return false;
+  }
+  return null;
+}
+function matchesWeekday(label,weekday){
+  const m=String(label||'').trim().toLowerCase().match(/^(ma|ti|ke|to|pe|la|su)(?:\s*[-–—]\s*(ma|ti|ke|to|pe|la|su))?$/);
+  if(!m)return false;
+  const start=WEEKDAYS.indexOf(m[1]),end=m[2]?WEEKDAYS.indexOf(m[2]):start;
+  return start<=end?weekday>=start&&weekday<=end:weekday>=start||weekday<=end;
+}
+function describeLunch(item,exception){
+  const raw=String(item.hours||'').trim();
+  if(item.closedException===true||/^(suljettu|closed)$/i.test(raw))return {status:'closed',label:exception?'午餐暂停 · 特殊时间':'午餐暂停 · 常规'};
+  const match=raw.match(/^(\d{1,2})[:.](\d{2})\s*[-–—]\s*(\d{1,2})[:.](\d{2})$/);
+  if(!match)return null;
+  const [,a,b,c,d]=match.map(Number);
+  if(a>23||c>23||b>59||d>59||a*60+b>=c*60+d)return null;
+  const time=`${String(a).padStart(2,'0')}:${String(b).padStart(2,'0')}–${String(c).padStart(2,'0')}:${String(d).padStart(2,'0')}`;
+  return {status:exception?'exception':'regular',label:`午餐 ${time} · ${exception?'特殊时间':'常规'}`};
+}
+export function resolveTodayLunchHours(visitingHours,iso){
+  const unknown={status:'unknown',label:'午餐时间未提供'};
+  const items=visitingHours?.lounas?.items;
+  const date=new Date(`${iso}T12:00:00Z`);
+  if(!Array.isArray(items)||!/^\d{4}-\d{2}-\d{2}$/.test(String(iso))||Number.isNaN(date.getTime())||date.toISOString().slice(0,10)!==iso)return unknown;
+  const exceptions=items.filter(item=>item.exception===true);
+  const matched=[];
+  for(const item of exceptions){
+    const match=matchesException(item.label,iso);
+    if(match===null)return {status:'unknown',label:'午餐时间请查看官网'};
+    if(match)matched.push(item);
+  }
+  const weekday=(date.getUTCDay()+6)%7;
+  const relevant=matched.length?matched:items.filter(item=>item.exception!==true&&matchesWeekday(item.label,weekday));
+  if(!relevant.length)return unknown;
+  const descriptions=relevant.map(item=>describeLunch(item,matched.length>0));
+  if(descriptions.some(x=>!x))return {status:'unknown',label:'午餐时间请查看官网'};
+  if(descriptions.some(x=>x.label!==descriptions[0].label))return {status:'unknown',label:'午餐时间请查看官网'};
+  return descriptions[0];
+}
+
+export function buildRecords(fi, en, token, iso=todayParts().iso) {
   const english=new Map((en||[]).map(r=>[r.slug,r]));
   return fi.map(r=>{
     const menu=(r.menuData?.menus||[]).find(m=>String(m.date||'').includes(token));
@@ -90,6 +156,6 @@ export function buildRecords(fi, en, token) {
       const marks=officialMarks(d);
       return {original,enName,language,text:language==='en'?enName:original,meat:detectMeat(d),fish:marks.containsFish||marks.containsCrustaceans||marks.containsMolluscs,marks};
     }).filter(Boolean);
-    return {slug:r.slug,name:r.title,campus:r.location?.[0]?.name||'Muut',address:r.address||r.menuData?.address||'',staff:/henkilöstö|opettajien/i.test(r.title||''),dishes};
+    return {slug:r.slug,name:r.title,campus:r.location?.[0]?.name||'Muut',address:r.address||r.menuData?.address||'',staff:/henkilöstö|opettajien/i.test(r.title||''),lunchHours:resolveTodayLunchHours(r.menuData?.visitingHours,iso),dishes};
   });
 }

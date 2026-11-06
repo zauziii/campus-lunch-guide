@@ -46,10 +46,10 @@ function render(){
     const header=el('summary','campus-heading');
     header.append(el('h2','campus-title',`${CAMPUS_NAMES[campus]||campus}${campus==='Keskusta'?'校区':''}`));
     const meta=el('span','campus-meta');const counts=el('span','campus-summary');
-    const meat=el('span','count');meat.append(el('i','dot meat'),document.createTextNode(`${meatCount} 家识别到肉`));
-    const fish=el('span','count');fish.append(el('i','dot fish'),document.createTextNode(`${fishCount} 家鱼 / 海鲜`));
+    const meat=el('span','count count-meat');meat.append(el('i','dot meat'),el('span','count-label','肉类线索'),el('strong','count-number',`${meatCount} 家`));
+    const fish=el('span','count count-fish');fish.append(el('i','dot fish'),el('span','count-label','鱼 / 海鲜'),el('strong','count-number',`${fishCount} 家`));
     counts.append(meat,fish);
-    if(pendingCount)counts.append(el('span','count pending-count',`${pendingCount} 家待确认`));
+    if(pendingCount){const pending=el('span','count pending-count');pending.append(el('span','count-label','待确认'),el('strong','count-number',`${pendingCount} 家`));counts.append(pending);}
     meta.append(counts);
     if(list.every(r=>!r.dishes.length))meta.append(el('span','missing-summary','暂无菜单'));
     const arrow=el('span','campus-arrow','⌄');arrow.setAttribute('aria-hidden','true');meta.append(arrow);
@@ -61,6 +61,7 @@ function render(){
       const row=el('tr');const name=el('th','restaurant-name');name.scope='row';
       name.append(el('span','name-text',restaurant.name));
       if(restaurant.staff)name.append(el('span','staff-tag','员工 / 教师'));
+      name.append(el('span',`lunch-hours ${restaurant.lunchHours.status}`,restaurant.lunchHours.label));
       row.append(name);
       if(!restaurant.dishes.length){const empty=el('td','no-menu','暂无菜单');empty.colSpan=2;row.append(empty);}
       else{
@@ -131,9 +132,9 @@ async function load(){
     async function get(language){const response=await fetch(`${API}?lang=${language}`,{cache:'no-store',signal:AbortSignal.timeout(25000)});if(!response.ok)throw Error('menu');const value=await response.json();if(!Array.isArray(value))throw Error('menu');return value;}
     const [fi,en]=await Promise.all([get('fi'),get('en').catch(()=>[])]);
     if(version!==run)return;
-    records=buildRecords(fi,en,today.token);render();
+    records=buildRecords(fi,en,today.token,today.iso);render();
     const time=new Intl.DateTimeFormat('zh-CN',{timeZone:'Europe/Helsinki',hour:'2-digit',minute:'2-digit'}).format(new Date());
-    setStatus(`已更新 ${time} · 芬兰时间`,true);translateAll(version);
+    setStatus(`已更新 ${time}`,true);translateAll(version);
   }catch{
     if(version!==run)return;setStatus('菜单暂时无法获取');content.innerHTML='<div class="state error"><div class="state-icon">!</div><h3>暂时无法获取菜单</h3><p>请稍后点击“刷新菜单”，也可以直接查看 UniCafe 官网。</p></div>';
   }finally{if(version===run)refreshButton.disabled=false;}
