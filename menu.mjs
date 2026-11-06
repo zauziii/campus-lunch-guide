@@ -3,6 +3,10 @@ export function todayParts(now=new Date()) {
   const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Helsinki',year:'numeric',month:'2-digit',day:'2-digit',weekday:'short'}).formatToParts(now).filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
   return {...parts,iso:`${parts.year}-${parts.month}-${parts.day}`, token:`${parts.day}.${parts.month}.`};
 }
+export function helsinkiMinutes(now=new Date()) {
+  const parts=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Helsinki',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(now).filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
+  return Number(parts.hour)*60+Number(parts.minute);
+}
 // Matches the category and colour logic used by UniCafe's menu application
 // as inspected on 2026-11-06. Orange means lunch or special, not meat.
 export function officialMarks(dish) {
@@ -69,8 +73,8 @@ export function detectMeat(dish) {
   const explicitlyPlantBased=/(?:vegaan|vegan|plant[- ]based|kasvipohjainen|lihattom)/iu.test(title);
   const ingredientHit=explicitlyPlantBased?null:findMeat(dish.ingredients);
   const titleHit=explicitlyPlantBased?null:findMeat(title);
-  if(ingredientHit)return {status:'identified',source:'配料',...ingredientHit};
   if(titleHit)return {status:'identified',source:'菜名',...titleHit};
+  if(ingredientHit)return {status:'identified',source:'配料',...ingredientHit};
   const orange=classifyDish(dish)==='orange';
   return {status:orange?'uncertain':'excluded',reason:orange?'没有明确肉类线索':'其他菜单类别'};
 }
@@ -118,7 +122,7 @@ function describeLunch(item,exception){
   const [,a,b,c,d]=match.map(Number);
   if(a>23||c>23||b>59||d>59||a*60+b>=c*60+d)return null;
   const time=`${String(a).padStart(2,'0')}:${String(b).padStart(2,'0')}–${String(c).padStart(2,'0')}:${String(d).padStart(2,'0')}`;
-  return {status:exception?'exception':'regular',label:`午餐 ${time} · ${exception?'特殊时间':'常规'}`};
+  return {status:exception?'exception':'regular',label:`午餐 ${time} · ${exception?'特殊时间':'常规'}`,startMinutes:a*60+b,endMinutes:c*60+d};
 }
 export function resolveTodayLunchHours(visitingHours,iso){
   const unknown={status:'unknown',label:'午餐时间未提供'};
@@ -139,6 +143,24 @@ export function resolveTodayLunchHours(visitingHours,iso){
   if(descriptions.some(x=>!x))return {status:'unknown',label:'午餐时间请查看官网'};
   if(descriptions.some(x=>x.label!==descriptions[0].label))return {status:'unknown',label:'午餐时间请查看官网'};
   return descriptions[0];
+}
+
+// Status is based on the published lunch schedule, not stock or actual opening.
+export function formatLunchHours(hours,minutes){
+  if(!hours)return '午餐时间未提供';
+  if(!['regular','exception'].includes(hours.status)||!Number.isInteger(hours.startMinutes)||!Number.isInteger(hours.endMinutes)||!Number.isInteger(minutes)||minutes<0||minutes>=1440)return hours.label;
+  const moment=minutes<hours.startMinutes?'未开始':minutes<hours.endMinutes?'时段内':'已结束';
+  return `${hours.label} · ${moment}`;
+}
+
+// Keep uncertain dishes and unknown hours visible: neither means meat-free or closed.
+export function shouldDisplayRestaurant(restaurant,minutes){
+  const dishes=Array.isArray(restaurant?.dishes)?restaurant.dishes:[];
+  if(!dishes.some(d=>d?.meat?.status==='identified'||d?.meat?.status==='uncertain'||d?.fish===true))return false;
+  const hours=restaurant?.lunchHours;
+  if(hours?.status==='closed')return false;
+  if(['regular','exception'].includes(hours?.status)&&Number.isInteger(hours.endMinutes)&&hours.endMinutes>=0&&hours.endMinutes<1440&&Number.isInteger(minutes)&&minutes>=0&&minutes<1440)return minutes<hours.endMinutes;
+  return true;
 }
 
 export function buildRecords(fi, en, token, iso=todayParts().iso) {
