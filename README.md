@@ -12,7 +12,7 @@ An independent guide to today's meat and fish options at UniCafe and Aalto Otani
 
 ## Updating and publishing
 
-The existing workflow runs once a day at **05:30 UTC** (normally 7:30 in Finland in winter and 8:30 in summer), on pushes to `main`, and when manually started from **Actions → Update translations and publish → Run workflow**. Scheduled runs can start later than their scheduled time.
+The existing workflow runs once a day at **05:30 UTC** (normally 07:30 in Finland in winter and 08:30 in summer), on pushes to `main`, and when manually started from **Actions → Update translations and publish → Run workflow**. Scheduled runs can start later than their scheduled time.
 
 The workflow uses the existing `AZURE_TRANSLATOR_KEY` repository secret and region `northeurope`. No new secret is needed for Aalto. The Aalto snapshot is refreshed by the workflow, not by the page's Refresh button; restaurant changes after collection may not appear until the next successful run. UniCafe menus continue to be requested by the browser. If Aalto collection fails, the last cached snapshot is retained when available and marked as an unsuccessful update.
 

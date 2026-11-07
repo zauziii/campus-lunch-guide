@@ -165,7 +165,7 @@ function selectUniversity(next){
   university=next;
   document.body.classList.toggle('school-aalto',next==='aalto');
   for(const button of document.querySelectorAll('[data-university]'))button.setAttribute('aria-pressed',String(button.dataset.university===next));
-  const link=document.querySelector('#source-link');link.href=next==='aalto'?'https://folio.kanttiinit.fi/en/area/1':'https://unicafe.fi/';
+  const link=document.querySelector('#source-link');link.href=next==='aalto'?'https://kanttiinit.fi/':'https://unicafe.fi/';
   link.replaceChildren(document.createTextNode(next==='aalto'?'Kanttiinit 菜单 ':'UniCafe 官网 '),el('span','','↗'));
   document.querySelector('#eyebrow').textContent=next==='aalto'?'AALTO · OTANIEMI':'HELSINKI · UNICAFE';
   document.querySelector('#fish-legend').textContent=next==='aalto'?'鱼 / 海鲜：识别到':'鱼 / 海鲜：官方标记';

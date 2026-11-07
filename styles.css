@@ -133,3 +133,11 @@
   .school-aalto .dish-cell.fish:before{content:'鱼 / 海鲜（已识别）'}
 }
 .no-results-note{grid-column:1 / -1;margin:0 0 2px;color:#647d69;font-size:13px;line-height:1.5}
+
+/* A quiet, readable wordmark for the Chinese site name. */
+.brand{gap:10px}
+.brand-mark{display:block;object-fit:contain;flex:none}
+.brand strong{font-size:18px;letter-spacing:.04em;color:#244a37}
+.brand strong span,footer strong span{font-weight:900;-webkit-text-stroke:.2px currentColor}
+footer>span:first-child{color:#748575;font-size:11px;letter-spacing:.01em}
+@media(max-width:520px){.brand strong{font-size:17px}footer>span:first-child{font-size:12px}}
