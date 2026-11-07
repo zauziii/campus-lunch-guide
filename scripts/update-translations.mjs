@@ -1,12 +1,16 @@
 import {readFile,writeFile,rename,mkdir} from 'node:fs/promises';
+import {execFile} from 'node:child_process';
+import {promisify} from 'node:util';
 import {dirname,resolve} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
-import {detectMeat,officialMarks} from '../menu.mjs';
+import {detectMeat,officialMarks,classifyAaltoDish} from '../menu.mjs';
 import {hasFinnishMenuWording,isUsableChineseTranslation,localDishTranslation} from '../translation.mjs';
 
 const MENU_URL='https://unicafe.fi/wp-json/swiss/v1/restaurants?lang=en';
 const TRANSLATE_URL='https://api.cognitive.microsofttranslator.com/translate?api-version=3.0&from=en&to=zh-Hans';
 const CACHE_PATH=fileURLToPath(new URL('../data/translations.json',import.meta.url));
+const AALTO_COLLECTOR=fileURLToPath(new URL('./collect-aalto.py',import.meta.url));
+const runFile=promisify(execFile);
 
 // Pre-translate published menus, including upcoming days. Use the same meat
 // and fish rules as the page; translated text never affects classification.
@@ -21,6 +25,19 @@ export function collectDishNames(restaurants){
         const meat=detectMeat(dish),marks=officialMarks(dish);
         if(meat.status==='identified'||meat.status==='uncertain'||marks.containsFish||marks.containsCrustaceans||marks.containsMolluscs)names.add(name);
       }
+    }
+  }
+  return [...names];
+}
+
+export function collectAaltoDishNames(snapshot){
+  const names=new Set();
+  for(const restaurant of Array.isArray(snapshot?.restaurants)?snapshot.restaurants:[]){
+    for(const day of Object.values(restaurant?.menus||{}))for(const dish of Array.isArray(day?.dishes)?day.dishes:[]){
+      const name=typeof dish?.name==='string'?dish.name.trim():'';
+      if(!name||hasFinnishMenuWording(name)||localDishTranslation(name))continue;
+      const classified=classifyAaltoDish(dish);
+      if(classified.meat.status==='identified'||classified.meat.status==='uncertain'||classified.fish)names.add(name);
     }
   }
   return [...names];
@@ -46,10 +63,10 @@ export function makeBatches(names){
   return {batches,skipped};
 }
 
-export async function buildCache({restaurants,previous,key,region='northeurope',fetchImpl=fetch,now=new Date()}){
+export async function buildCache({restaurants,previous,aalto,key,region='northeurope',fetchImpl=fetch,now=new Date()}){
   if(typeof key!=='string'||!key.trim())throw new Error('Missing AZURE_TRANSLATOR_KEY. Add it to the repository Actions secrets.');
   if(typeof region!=='string'||!region.trim())throw new Error('Missing Azure Translator region.');
-  const translations=cleanCache(previous),names=collectDishNames(restaurants);
+  const translations=cleanCache(previous),names=[...new Set([...collectDishNames(restaurants),...collectAaltoDishNames(aalto)])];
   const pending=names.filter(name=>!Object.hasOwn(translations,name));
   const {batches,skipped}=makeBatches(pending);let added=0,untranslated=skipped;
   for(const batch of batches){
@@ -79,16 +96,22 @@ async function readPrevious(){
 export async function main(){
   const key=process.env.AZURE_TRANSLATOR_KEY,region=process.env.AZURE_TRANSLATOR_REGION||'northeurope';
   if(!key?.trim())throw new Error('Missing AZURE_TRANSLATOR_KEY. Add it to the repository Actions secrets.');
+  const previous=await readPrevious();
+  const aaltoPromise=runFile('python3',[AALTO_COLLECTOR],{timeout:120000,maxBuffer:12*1024*1024,env:{PATH:process.env.PATH||'/usr/bin:/bin',LANG:'C.UTF-8',TZ:'Europe/Helsinki'}})
+    .then(({stdout})=>{const data=JSON.parse(stdout);if(!Array.isArray(data?.restaurants))throw Error('Unexpected Aalto data');return data;})
+    .catch(()=>previous.aalto?{...previous.aalto,refreshFailed:true}:{version:1,collectedAt:null,restaurants:[],refreshFailed:true});
   const response=await fetch(MENU_URL,{signal:AbortSignal.timeout(30000)});
   if(!response.ok)throw new Error(`UniCafe returned HTTP ${response.status}; the existing site has not been replaced.`);
-  const restaurants=await response.json(),previous=await readPrevious();
-  const result=await buildCache({restaurants,previous,key,region});
+  const restaurants=await response.json(),aalto=await aaltoPromise;
+  const result=await buildCache({restaurants,previous,aalto,key,region});
   const {stats,...cache}=result;
+  cache.aalto=aalto;
   await mkdir(dirname(CACHE_PATH),{recursive:true});
   const temporary=`${CACHE_PATH}.tmp`;
   await writeFile(temporary,`${JSON.stringify(cache,null,2)}\n`,'utf8');
   await rename(temporary,CACHE_PATH);
   console.log(`Published menu names: ${stats.publishedNames}; new translations: ${stats.added}; waiting: ${stats.untranslated}.`);
+  console.log(`Otaniemi restaurants: ${aalto.restaurants.length}; source update: ${aalto.refreshFailed?'unavailable':aalto.partial?'partial':'complete'}.`);
 }
 
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){

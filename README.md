@@ -1,13 +1,26 @@
 # Campus Lunch Guide
 
-A simple, independent guide to today's meat and fish options at UniCafe restaurants across Helsinki campuses, with Chinese translations.
+An independent guide to today's meat and fish options at UniCafe and Aalto Otaniemi restaurants, with Chinese translations. The University of Helsinki is selected by default; use the switch at the top to see Aalto.
 
 ## How it works
 
-- The browser fetches UniCafe's **English** menu feed, uses the current Helsinki date and refreshes the menu every 15 minutes while the page is open. Menu availability and lunch times come from UniCafe, not the translation service.
-- Campuses are collapsed by default and show counts of restaurants with identified meat, official fish/shellfish markers, or dishes requiring review. Lunches that have ended and restaurants with no relevant dishes are hidden; unknown hours and uncertain dishes remain visible.
-- Meat detection uses the official name and ingredients. Fish and shellfish use UniCafe's declared allergen fields. Both are independent of the Chinese translation; an unrecognized dish is not necessarily meat-free. Some fields in the English feed remain Finnish, so the recognition rules also account for those fields.
-- Chinese and the official English-feed name appear together. An exact-match dictionary takes priority; GitHub Actions translates other new relevant English dish names with Azure Translator and publishes `data/translations.json`. Clearly Finnish titles detected in the English feed are not sent as English, but that detection is not exhaustive.
-- If a new dish has not yet been translated, the page shows the original name and “中文待更新”. The two user-confirmed fish translations are maintained in the local dictionary. The page and browser never receive the Azure key.
+- **UniCafe:** The browser loads UniCafe's English menu feed and refreshes it every 15 minutes while the page is open. It uses the current Helsinki date and the published lunch schedule.
+- **Aalto / Otaniemi:** GitHub Actions collects the Otaniemi restaurant list and menus from Kanttiinit, and looks for more detailed menus at the restaurants' official sources. The resulting snapshot is published alongside the translations. The page shows when it was collected and warns when sources or today's menus are missing. Restaurant names link to their own official sites; see [Aalto sources](AALTO_SOURCES.md).
+- **Meat and fish:** Official recipe or ingredient information is used where it is available. Otherwise explicit meat or fish names are identified from the dish title, and the page identifies the evidence used. UniCafe fish is based on official allergen fields. A dish that cannot be classified remains “待确认”; this does not mean it contains no meat or fish. Translation never determines classification.
+- Restaurants with known ended lunch times and restaurants without relevant dishes are hidden. Unknown hours and uncertain dishes remain visible. Some Aalto entries only provide general weekly opening hours, which are marked as a regular reference and may differ from the actual lunch period or exceptional hours.
+- English names and Chinese translations appear together. GitHub Actions translates new relevant English names with Azure Translator and caches them. The existing local dictionary takes precedence; the Azure key is never exposed to the website. When a title appears to be Finnish, the original name remains visible. Finnish names that can be identified as such are not sent for translation as English.
 
-This independent project is not affiliated with UniCafe. Automatic classification and translation can be wrong; consult UniCafe and restaurant staff for dietary or allergen decisions.
+## Updating and publishing
+
+The existing workflow runs once a day at **05:30 UTC** (normally 7:30 in Finland in winter and 8:30 in summer), on pushes to `main`, and when manually started from **Actions → Update translations and publish → Run workflow**. Scheduled runs can start later than their scheduled time.
+
+The workflow uses the existing `AZURE_TRANSLATOR_KEY` repository secret and region `northeurope`. No new secret is needed for Aalto. The Aalto snapshot is refreshed by the workflow, not by the page's Refresh button; restaurant changes after collection may not appear until the next successful run. UniCafe menus continue to be requested by the browser. If Aalto collection fails, the last cached snapshot is retained when available and marked as an unsuccessful update.
+
+## Checks
+
+```sh
+node --test tests/*.test.mjs
+python3 -m unittest discover -s tests -p 'test_*.py' -q
+```
+
+This independent project is not affiliated with UniCafe, Aalto, Kanttiinit or the restaurant operators. Automatic classification and translation can be wrong; consult the restaurant and its staff for dietary or allergen decisions.

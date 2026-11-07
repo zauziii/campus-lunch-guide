@@ -1,4 +1,4 @@
-export const CAMPUS_NAMES = {'City Centre':'市中心',Keskusta:'市中心',Meilahti:'Meilahti',Viikki:'Viikki',Kumpula:'Kumpula','Töölö':'Töölö',Muut:'其他'};
+export const CAMPUS_NAMES = {'City Centre':'市中心',Keskusta:'市中心',Meilahti:'Meilahti',Viikki:'Viikki',Kumpula:'Kumpula','Töölö':'Töölö',Otaniemi:'Otaniemi',Muut:'其他'};
 export function todayParts(now=new Date()) {
   const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Helsinki',year:'numeric',month:'2-digit',day:'2-digit',weekday:'short'}).formatToParts(now).filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
   return {...parts,iso:`${parts.year}-${parts.month}-${parts.day}`, token:`${parts.day}.${parts.month}.`};
@@ -210,5 +210,72 @@ export function buildRecords(restaurants, token, iso=todayParts().iso) {
       return {original,meat:detectMeat(d),fish:marks.containsFish||marks.containsCrustaceans||marks.containsMolluscs,marks};
     }).filter(Boolean);
     return {slug:r.slug,name:r.title,campus:r.location?.[0]?.name||'Muut',address:r.address||r.menuData?.address||'',staff:/henkilöstö|opettajien|\bstaff\b|\bteachers?\b/i.test(r.title||''),lunchHours:resolveTodayLunchHours(r.menuData?.visitingHours,iso),dishes};
+  });
+}
+
+const FISH_NAME=/(?:\b(?:fish|salmon|trout|cod|saithe|pollock|herring|tuna|perch|pike|vendace|anchov(?:y|ies)|whitefish|plaice)\b|(?:^|[^\p{L}])[\p{L}-]*(?:kala|lohi|seiti|seit[äa]|muikku|ahven|turska|tonnikala|silakka|silli|kuha)[\p{L}-]*)/iu;
+const CRUSTACEAN_NAME=/(?:\b(?:shrimp|prawns?|crab|lobster|crustaceans?)\b|(?:^|[^\p{L}])[\p{L}-]*(?:katkarapu|äyriäi)[\p{L}-]*)/iu;
+const MOLLUSC_NAME=/(?:\b(?:molluscs?|mussels?|oysters?|squid|octopus|scallops?)\b|(?:^|[^\p{L}])[\p{L}-]*(?:simpukka|mustekala|nilviäi)[\p{L}-]*)/iu;
+function declaredFoodText(value){
+  return String(value||'').replace(/(?:may\s+contain|saattaa\s+sisältää|voi\s+sisältää)[^.!?;]*/giu,' ')
+    // "Ranskalaiset / ranskalaisia" (French fries) contains the letters
+    // "kala" but is not a Finnish fish name.
+    .replace(/(?:^|[^\p{L}])ranskala[\p{L}-]*/giu,' ')
+    .replace(/(?:fish[- ]free|seafood[- ]free|kalaton|ilman\s+kalaa)[\p{L}-]*/giu,' ');
+}
+function foodProperties(item){return Array.isArray(item?.properties)?item.properties.map(x=>String(x).trim().toLowerCase()):[];}
+
+// Official recipes and ingredients have priority; explicit dish titles are a
+// separate, weaker signal. Absence of a match does not establish meat-free food.
+export function classifyAaltoDish(item){
+  const name=String(item?.name||'').trim(),category=String(item?.category||'');
+  const properties=foodProperties(item),vegetarian=properties.some(x=>['vv','veg','vegan','vegetarian'].includes(x))
+    ||/(?:\bvegan\b|\bvegetarian\b|veg(etaar|aan|aaninen)|kasvislounas|kasviskeitto)/iu.test(`${category} ${name}`);
+  const info=[...(Array.isArray(item?.components)?item.components:[]),...(Array.isArray(item?.ingredients)?item.ingredients:[])].join(' ');
+  const declared=[...(Array.isArray(item?.allergens)?item.allergens:[])].map(declaredFoodText).join(' ');
+  const sourceText=declaredFoodText(info),titleText=declaredFoodText(name);
+  const marks={containsFish:FISH_NAME.test(declared),containsCrustaceans:CRUSTACEAN_NAME.test(declared),containsMolluscs:MOLLUSC_NAME.test(declared)};
+  const fishInSource=FISH_NAME.test(sourceText),crustaceanInSource=CRUSTACEAN_NAME.test(sourceText),molluscInSource=MOLLUSC_NAME.test(sourceText);
+  const fishInTitle=FISH_NAME.test(titleText),crustaceanInTitle=CRUSTACEAN_NAME.test(titleText),molluscInTitle=MOLLUSC_NAME.test(titleText);
+  const sourceMeat=detectMeat({name:'',ingredients:sourceText,meta:{},price:{}});
+  const titleMeat=detectMeat({name:titleText,ingredients:'',meta:{},price:{}});
+  if(vegetarian||/(?:dessert|jälkiruoka|jalkiruoka)/iu.test(category)){
+    return {original:name,meat:{status:'excluded',reason:'官方素食或甜点标记'},fish:false,marks:{containsFish:false,containsCrustaceans:false,containsMolluscs:false},source:item?.source};
+  }
+  let meat=sourceMeat.status==='identified'?{...sourceMeat,source:'食材信息'}:titleMeat.status==='identified'?{...titleMeat,source:'菜名'}:{status:'uncertain',reason:'信息不足'};
+  const officialFish=marks.containsFish||marks.containsCrustaceans||marks.containsMolluscs;
+  const sourceFish=fishInSource||crustaceanInSource||molluscInSource;
+  const titleFish=fishInTitle||crustaceanInTitle||molluscInTitle;
+  const fish=officialFish||sourceFish||titleFish;
+  const fishEvidence=officialFish?'官方过敏原':sourceFish?'食材信息':titleFish?'菜名':'';
+  if(fish&&meat.status==='uncertain')meat={status:'excluded',reason:'已识别为鱼或海鲜'};
+  return {original:name,meat,fish,fishEvidence,source:item?.source,marks:{
+    containsFish:marks.containsFish||fishInSource||fishInTitle,
+    containsCrustaceans:marks.containsCrustaceans||crustaceanInSource||crustaceanInTitle,
+    containsMolluscs:marks.containsMolluscs||molluscInSource||molluscInTitle
+  }};
+}
+
+function aaltoHours(day,weekly,iso){
+  const h=day?.lunchHours;
+  if(Number.isInteger(h?.start)&&Number.isInteger(h?.end)&&h.start>=0&&h.end<=1440&&h.start<h.end){
+    const txt=`${String(Math.floor(h.start/60)).padStart(2,'0')}:${String(h.start%60).padStart(2,'0')}–${String(Math.floor(h.end/60)).padStart(2,'0')}:${String(h.end%60).padStart(2,'0')}`;
+    return {status:'regular',label:`午餐 ${txt} · 官网`,startMinutes:h.start,endMinutes:h.end};
+  }
+  const date=new Date(`${iso}T12:00:00Z`),index=(date.getUTCDay()+6)%7;
+  const hours=Array.isArray(weekly)?String(weekly[index]||''):'';
+  const match=hours.match(/^(\d{1,2}):(\d{2})\s*[-–—]\s*(\d{1,2}):(\d{2})$/);
+  if(match){const [,a,b,c,d]=match.map(Number);if(a<24&&c<24&&b<60&&d<60&&a*60+b<c*60+d){const txt=`${String(a).padStart(2,'0')}:${String(b).padStart(2,'0')}–${String(c).padStart(2,'0')}:${String(d).padStart(2,'0')}`;return {status:'regular',label:`营业 ${txt} · 常规参考`,startMinutes:a*60+b,endMinutes:c*60+d};}}
+  return {status:'unknown',label:'时间请查看官网'};
+}
+
+export function buildAaltoRecords(snapshot,iso=todayParts().iso){
+  if(!snapshot||!Array.isArray(snapshot.restaurants))return [];
+  return snapshot.restaurants.filter(r=>r&&Number.isSafeInteger(r.id)).map(r=>{
+    const day=r.menus&&typeof r.menus==='object'?r.menus[iso]:null;
+    const dishes=(Array.isArray(day?.dishes)?day.dishes:[]).filter(d=>typeof d?.name==='string'&&d.name.trim()).map(classifyAaltoDish);
+    let url='';try{const parsed=new URL(String(r.url||''));if(parsed.protocol==='https:')url=parsed.href;}catch{}
+    return {slug:`aalto-${r.id}`,name:String(r.name||''),campus:'Otaniemi',address:String(r.address||''),staff:false,
+      officialUrl:url,sourceAvailable:r.sourceAvailable!==false,hasMenu:!!day,lunchHours:aaltoHours(day,r.weeklyHours,iso),dishes};
   });
 }

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f8f9f5">
-  <meta name="description" content="根据 UniCafe 菜单和配料查找赫尔辛基各校区的肉类午餐。">
+  <meta name="description" content="查看赫尔辛基大学和阿尔托大学附近食堂的肉类与鱼类午餐。">
   <title>Campus Lunch Guide | 今天哪里有肉和鱼？</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
@@ -13,11 +13,15 @@
 <body>
   <header class="header"><div class="header-inner">
     <a class="brand" href="#top" aria-label="Campus Lunch Guide 首页"><span class="brand-mark" aria-hidden="true">✳</span><strong>campus lunch<span>.</span></strong></a>
-    <a class="external" href="https://unicafe.fi/" target="_blank" rel="noopener noreferrer">UniCafe 官网 <span aria-hidden="true">↗</span></a>
+    <a class="external" id="source-link" href="https://unicafe.fi/" target="_blank" rel="noopener noreferrer">UniCafe 官网 <span aria-hidden="true">↗</span></a>
   </div></header>
   <main id="top" class="page">
+    <nav class="university-switch" aria-label="选择大学">
+      <button class="university-option" type="button" data-university="helsinki" aria-pressed="true">赫尔辛基大学</button>
+      <button class="university-option" type="button" data-university="aalto" aria-pressed="false">阿尔托大学</button>
+    </nav>
     <section class="intro">
-      <div><p class="eyebrow">HELSINKI · UNICAFE</p><h1>今天哪里有肉和鱼<span>？</span></h1><p class="intro-text">根据官方菜单查找肉类和鱼类。</p></div>
+      <div><p class="eyebrow" id="eyebrow">HELSINKI · UNICAFE</p><h1>今天哪里有肉和鱼<span>？</span></h1><p class="intro-text">根据菜单查找肉类和鱼类。</p></div>
       <div class="date-panel"><span>TODAY</span><strong id="today">正在获取日期…</strong><small>赫尔辛基时间</small></div>
     </section>
     <section class="menu-section" aria-label="各校区今日菜单">
@@ -25,11 +29,11 @@
         <div class="live-status" id="status" aria-live="polite"><span class="status-dot"></span> 正在获取官方菜单…</div>
         <div class="controls"><button id="refresh" class="text-button" type="button"><span aria-hidden="true">↻</span> 刷新</button></div>
       </div>
-      <div class="table-key"><span>已隐藏午餐结束或未找到相关菜品的食堂</span><span class="legend"><span class="legend-item"><i class="dot meat" aria-hidden="true"></i><span>肉类：识别到</span></span><span class="legend-item"><i class="dot fish" aria-hidden="true"></i><span>鱼 / 海鲜：官方标记</span></span></span></div>
+      <div class="table-key"><span>已隐藏午餐结束或未找到相关菜品的食堂</span><span class="legend"><span class="legend-item"><i class="dot meat" aria-hidden="true"></i><span>肉类：识别到</span></span><span class="legend-item"><i class="dot fish" aria-hidden="true"></i><span id="fish-legend">鱼 / 海鲜：官方标记</span></span></span></div>
       <div id="content" aria-live="polite"><div class="state"><div class="spinner"></div><h3>正在查看今天的菜单</h3><p>从 UniCafe 获取最新信息…</p></div></div>
-      <div class="notice"><span class="notice-icon">i</span><p>午餐时间未知及有待确认菜品的食堂会保留。肉类依据官方菜名和配料识别，可能遗漏或误判；配料有时属于酱汁或不同选项。“待确认”不能当作没有肉；各项食堂数量可能重叠。鱼 / 海鲜依据官方过敏原标记。午餐状态根据官网时间计算，不代表实际供应或库存；翻译可能有误。详情及过敏与饮食限制请查看 <a href="https://unicafe.fi/" target="_blank" rel="noopener noreferrer">UniCafe 官网 ↗</a>。</p></div>
+      <div class="notice"><span class="notice-icon">i</span><p id="notice-copy">午餐时间未知及有待确认菜品的食堂会保留。肉类依据官方菜名和配料识别，可能遗漏或误判；配料有时属于酱汁或不同选项。“待确认”不能当作没有肉；各项食堂数量可能重叠。鱼 / 海鲜依据官方过敏原标记。午餐状态根据官网时间计算，不代表实际供应或库存；翻译可能有误。详情及过敏与饮食限制请查看 <a href="https://unicafe.fi/" target="_blank" rel="noopener noreferrer">UniCafe 官网 ↗</a>。</p></div>
     </section>
   </main>
-  <footer><span><strong>campus lunch<span>.</span></strong> <i>·</i> 好好吃午饭，每一天。</span><span>非官方独立项目 · 数据来源 UniCafe</span></footer>
+  <footer><span><strong>campus lunch<span>.</span></strong> <i>·</i> 好好吃午饭，每一天。</span><span id="footer-source">非官方独立项目 · 数据来源 UniCafe</span></footer>
 </body>
 </html>
