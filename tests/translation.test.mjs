@@ -1,37 +1,63 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {localDishTranslation,isUsableChineseTranslation,inspectTranslationResponse,translateQueue} from '../translation.mjs';
+import {hasFinnishMenuWording,localDishTranslation,isUsableChineseTranslation} from '../translation.mjs';
+import {buildCache,collectDishNames,makeBatches} from '../scripts/update-translations.mjs';
 
-test('local translations match complete known dish names only',()=>{
-  assert.equal(localDishTranslation('  kermainen   savulohikeitto  '),'奶油烟熏三文鱼汤');
-  assert.equal(localDishTranslation('Kermainen savulohikeitto ja salaatti'),'');
+const restaurants=[{menuData:{menus:[{date:'Mon 09.11.',data:[
+  {name:'Chicken and rice',ingredients:'chicken, rice'},
+  {name:'Salmon soup',meta:{1:['Fish']}},
+  {name:'Chicken and rice',ingredients:'chicken, rice'},
+  {name:'Saithe in pesto sauce',meta:{1:['Fish']}},
+  {name:'Seitä pestokastikkeessa',meta:{1:['Fish']}},
+  {name:'Tofu and vegetables',meta:{0:['Veg']}}
+]}]}}];
+
+test('local overrides are exact, including the two confirmed fish dishes',()=>{
+  assert.equal(localDishTranslation('  Chicken   bolognese  '),'鸡肉肉酱');
+  assert.equal(localDishTranslation('Chicken bolognese and salad'),'');
+  assert.equal(localDishTranslation('Saithe in pesto sauce'),'青鳕配罗勒酱');
+  assert.equal(localDishTranslation('Lemon fish with orange remoulade'),'柠檬鱼配橙香雷莫兰酱');
 });
-test('translation responses reject exhausted quotas and untranslated text',()=>{
-  assert.deepEqual(inspectTranslationResponse({responseStatus:429,responseData:{translatedText:'MYMEMORY WARNING: quota'}}),{status:'quota'});
-  assert.deepEqual(inspectTranslationResponse({},429),{status:'quota'});
-  assert.deepEqual(inspectTranslationResponse({responseStatus:200,quotaFinished:1}),{status:'quota'});
-  assert.deepEqual(inspectTranslationResponse({responseStatus:200,responseData:{translatedText:'Chicken soup'}}),{status:'invalid'});
-  assert.deepEqual(inspectTranslationResponse({responseStatus:200,responseData:{translatedText:'鸡肉汤'}}),{status:'success',text:'鸡肉汤'});
-  assert.equal(isUsableChineseTranslation('MYMEMORY WARNING: 中文'),false);
+
+test('clearly Finnish titles are not sent as English',()=>{
+  for(const title of ['Kermainen savulohikeitto','4311 Kanapyörykät thaikastikkeessa (Thaimaa)','Kalapuikot, tartarkastike','Seitä pestokastikkeessa'])assert.equal(hasFinnishMenuWording(title),true,title);
+  for(const title of ['Chicken bolognese','Fish bites, remoulade','Oven baked sausage'])assert.equal(hasFinnishMenuWording(title),false,title);
+  assert.deepEqual(collectDishNames(restaurants),['Chicken and rice','Salmon soup']);
 });
-test('one bad translation does not discard other dishes and quota stops further requests',async()=>{
-  const requested=[],saved=[];
-  const outcome=await translateQueue(['bad','good','quota','later'],{
-    concurrency:1,
-    request:async item=>{requested.push(item);return item==='bad'?{status:'invalid'}:item==='quota'?{status:'quota'}:{status:'success',text:'鸡肉'};},
-    onResult:(item,text)=>saved.push([item,text])
+
+test('Azure is called only for uncached relevant dishes with the regional header',async()=>{
+  let request;
+  const result=await buildCache({restaurants,previous:{translations:{'Chicken and rice':'鸡肉配米饭'}},key:'test-key',region:'northeurope',now:new Date('2026-11-07T03:00:00Z'),fetchImpl:async(url,options)=>{
+    request={url,options};
+    return {ok:true,json:async()=>[{translations:[{text:'三文鱼汤',to:'zh-Hans'}]}]};
+  }});
+  assert.match(request.url,/from=en&to=zh-Hans/);
+  assert.equal(request.options.headers['Ocp-Apim-Subscription-Region'],'northeurope');
+  assert.equal(request.options.headers['Ocp-Apim-Subscription-Key'],'test-key');
+  assert.deepEqual(JSON.parse(request.options.body),[{Text:'Salmon soup'}]);
+  assert.equal(result.translations['Chicken and rice'],'鸡肉配米饭');
+  assert.equal(result.translations['Salmon soup'],'三文鱼汤');
+  assert.equal(result.stats.added,1);
+  assert.equal(result.updatedAt,'2026-11-07T03:00:00.000Z');
+});
+
+test('Azure errors stop publication without exposing the key',async()=>{
+  await assert.rejects(buildCache({restaurants,previous:{},key:'fake-secret',fetchImpl:async()=>({ok:false,status:403})}),error=>{
+    assert.match(error.message,/403/);
+    assert.doesNotMatch(error.message,/fake-secret/);
+    return true;
   });
-  assert.deepEqual(requested,['bad','good','quota']);
-  assert.deepEqual(saved,[['good','鸡肉']]);
-  assert.equal(outcome.quota,true);
+  await assert.rejects(buildCache({restaurants,previous:{},key:''}),/AZURE_TRANSLATOR_KEY/);
 });
-test('stops retrying after repeated service failures',async()=>{
-  let requests=0;
-  const outcome=await translateQueue([1,2,3,4],{concurrency:1,request:async()=>{requests++;throw Error('network');},onResult:()=>{}});
-  assert.equal(requests,2);assert.equal(outcome.unavailable,true);
-});
-test('a changed menu stops an obsolete translation queue',async()=>{
-  let active=true;const saved=[];
-  await translateQueue([1,2],{concurrency:1,shouldContinue:()=>active,request:async()=>{active=false;return {status:'success',text:'鸡肉'};},onResult:(item)=>saved.push(item)});
-  assert.deepEqual(saved,[]);
+
+test('bad translations are not cached and large requests are split',async()=>{
+  const result=await buildCache({restaurants,previous:{},key:'test-key',fetchImpl:async()=>({ok:true,json:async()=>[
+    {translations:[{text:'鸡肉配米饭'}]},
+    {translations:[{text:'Salmon soup'}]}
+  ]})});
+  assert.equal(result.translations['Chicken and rice'],'鸡肉配米饭');
+  assert.equal(Object.hasOwn(result.translations,'Salmon soup'),false);
+  assert.equal(result.stats.untranslated,1);
+  assert.equal(isUsableChineseTranslation('translation failed 中文'),false);
+  assert.deepEqual(makeBatches(Array.from({length:51},(_,i)=>`Dish ${i}`)).batches.map(batch=>batch.length),[50,1]);
 });

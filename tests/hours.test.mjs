@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {buildRecords,resolveTodayLunchHours,formatLunchHours,helsinkiMinutes,detectMeat} from '../menu.mjs';
+import {buildRecords,resolveTodayLunchHours,formatLunchHours,helsinkiMinutes,detectMeat,officialMarks} from '../menu.mjs';
 
 const schedule=(items)=>({lounas:{items}});
 const regular={label:'Ma–Pe',hours:'10:30-14:30',closedException:false};
@@ -35,12 +35,20 @@ test('does not silently ignore an exception it cannot interpret',()=>{
   const data=schedule([regular,{exception:true,label:'pyhäpäivä',hours:'Suljettu'}]);
   assert.deepEqual(resolveTodayLunchHours(data,'2026-11-06'),{status:'unknown',label:'午餐时间请查看官网'});
 });
-test('restaurant records include lunch hours without changing meat recognition',()=>{
-  const dishes=[{name:'Broilerikastike',ingredients:'broileri',meta:{}}];
-  const fi=[{slug:'example',title:'Example',menuData:{visitingHours:schedule([regular]),menus:[{date:'06.11.',data:dishes}]}}];
-  const [record]=buildRecords(fi,[],'06.11.','2026-11-06');
+test('English-feed records include lunch hours and meat recognition',()=>{
+  const dishes=[{name:'Chicken bolognese',ingredients:'chicken mince',meta:{}}];
+  const english=[{slug:'example',title:'Example',location:[{name:'City Centre'}],menuData:{visitingHours:schedule([{label:'Mon–Fri',hours:'10:30-14:30'}]),menus:[{date:'Fri 06.11.',data:dishes}]}}];
+  const [record]=buildRecords(english,'06.11.','2026-11-06');
   assert.equal(record.lunchHours.status,'regular');
+  assert.equal(record.campus,'City Centre');
+  assert.equal(record.dishes[0].original,'Chicken bolognese');
   assert.equal(record.dishes[0].meat.status,'identified');
+});
+test('understands the English weekday and closure labels used by UniCafe',()=>{
+  const data=schedule([{label:'Mon–Fri',hours:'10:30–14:30'},{label:'Sat–Sun',hours:'Closed',closedException:true}]);
+  assert.equal(resolveTodayLunchHours(data,'2026-11-06').endMinutes,870);
+  assert.equal(resolveTodayLunchHours(data,'2026-11-07').status,'closed');
+  assert.equal(resolveTodayLunchHours(data,'2026-11-08').status,'closed');
 });
 test('shows lunch status at the correct boundaries without assuming stock',()=>{
   const hours=resolveTodayLunchHours(schedule([regular]),'2026-11-06');
@@ -56,18 +64,29 @@ test('uses Helsinki time in winter and summer',()=>{
   assert.equal(helsinkiMinutes(new Date('2026-06-01T09:30:00Z')),12*60+30);
 });
 test('distinguishes meat named in a title from meat only in ingredients',()=>{
-  const named=detectMeat({name:'Broilerikastike',ingredients:'broileri',meta:{}});
-  const inIngredients=detectMeat({name:'Carbonara-kastiketta',ingredients:'kerma, pekoni',meta:{}});
+  const named=detectMeat({name:'Chicken bolognese',ingredients:'chicken',meta:{}});
+  const inIngredients=detectMeat({name:'Oven baked sausage',ingredients:'water, chicken, turkey',meta:{}});
   assert.equal(named.source,'菜名');assert.equal(named.animal,'鸡肉');
-  assert.equal(inIngredients.source,'配料');assert.equal(inIngredients.animal,'猪肉');
-  assert.equal(detectMeat({name:'Broilerikastike',ingredients:'broileri',meta:{'0':['K']}}).status,'identified');
+  assert.equal(inIngredients.source,'配料');assert.equal(inIngredients.animal,'鸡肉');
+  assert.equal(detectMeat({name:'Chicken bolognese',ingredients:'chicken',meta:{'0':['K']}}).status,'identified');
+});
+test('does not treat vegan names, trace warnings or bouillon as meat dishes',()=>{
+  assert.notEqual(detectMeat({name:'Vegetarian chicken-style strips',ingredients:'soy protein',meta:{}}).status,'identified');
+  assert.notEqual(detectMeat({name:'Vegetable soup',ingredients:'water, carrot; may contain traces of chicken.',meta:{}}).status,'identified');
+  assert.notEqual(detectMeat({name:'Vegetable soup',ingredients:'water, chicken bouillon powder (salt, chicken meat powder), carrot',meta:{}}).status,'identified');
+});
+test('accepts English-feed fish labels without confusing trace warnings for ingredients',()=>{
+  assert.equal(officialMarks({meta:{'1':['fish']}}).containsFish,true);
+  assert.equal(officialMarks({meta:{'1':['kalat']}}).containsFish,true);
+  assert.equal(officialMarks({meta:{'1':['may contain traces of fish']}}).containsFish,false);
+  assert.equal(officialMarks({meta:{'1':['saattaa sisältää: kalat']}}).containsFish,false);
 });
 test('keeps each restaurant associated with its own official address',()=>{
   const input=[
     {slug:'metsatalo',title:'Metsätalo',address:'Fabianinkatu 39',menuData:{}},
     {slug:'terkko',title:'Terkko',address:'Haartmaninkatu 4',menuData:{}}
   ];
-  const records=buildRecords(input,[],'06.11.','2026-11-06');
+  const records=buildRecords(input,'06.11.','2026-11-06');
   assert.deepEqual(records.map(r=>[r.name,r.address]),[['Metsätalo','Fabianinkatu 39'],['Terkko','Haartmaninkatu 4']]);
   assert.equal('officialUrl' in records[0],false);
 });

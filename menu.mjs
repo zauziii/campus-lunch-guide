@@ -1,4 +1,4 @@
-export const CAMPUS_NAMES = {Keskusta:'市中心',Meilahti:'Meilahti',Viikki:'Viikki',Kumpula:'Kumpula','Töölö':'Töölö',Muut:'其他'};
+export const CAMPUS_NAMES = {'City Centre':'市中心',Keskusta:'市中心',Meilahti:'Meilahti',Viikki:'Viikki',Kumpula:'Kumpula','Töölö':'Töölö',Muut:'其他'};
 export function todayParts(now=new Date()) {
   const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Helsinki',year:'numeric',month:'2-digit',day:'2-digit',weekday:'short'}).formatToParts(now).filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
   return {...parts,iso:`${parts.year}-${parts.month}-${parts.day}`, token:`${parts.day}.${parts.month}.`};
@@ -13,9 +13,11 @@ export function officialMarks(dish) {
   const flags=Array.isArray(dish.meta?.['0']) ? dish.meta['0'] : [];
   const allergens=Array.isArray(dish.meta?.['1']) ? dish.meta['1'] : [];
   const extra=Array.isArray(dish.meta?.['2']) ? dish.meta['2'] : [];
-  const containsFish=allergens.some(x=>/kala|fish|fisk/i.test(String(x))) || extra.some(x=>/kala/i.test(String(x)));
-  const containsCrustaceans=allergens.some(x=>/äyriä|crustacean/i.test(String(x)));
-  const containsMolluscs=allergens.some(x=>/nilviä|mollus/i.test(String(x)));
+  // A precautionary trace warning is not the same as a declared ingredient.
+  const declared=allergens.filter(x=>!/^\s*(?:may\s+contain|saattaa\s+sisältää)/i.test(String(x)));
+  const containsFish=declared.some(x=>/kala|fish|fisk/i.test(String(x))) || extra.some(x=>/kala|fish|fisk/i.test(String(x)));
+  const containsCrustaceans=declared.some(x=>/äyriä|crustacean/i.test(String(x)));
+  const containsMolluscs=declared.some(x=>/nilviä|mollus/i.test(String(x)));
   // UniCafe documents Veg as vegan. Do not guess that unlisted abbreviations
   // such as K or VE have the same meaning as at other food providers.
   const vegetarian=/^kasvislounas$/i.test(String(dish.price?.name||'').trim());
@@ -32,10 +34,10 @@ export function classifyDish(dish) {
   if(priceName.toLowerCase().includes('lisäke'))category='side';
   return category==='fish'?'fish':category==='lunch'||category==='special'?'orange':'other';
 }
-// Recognize explicit meat wording, while avoiding common Finnish compounds
-// that otherwise produce false positives, e.g. porkkana (carrot) and kananmuna (egg).
+// Recognize explicit meat wording in the English feed. Some fields in that
+// feed still contain Finnish, so retain their existing safe recognition rules.
 function stripBrothComponents(text) {
-  const pattern=/[\p{L}-]*(?:liemijauhe|liemitiiviste|liemi|aromi|gelatiini)[\p{L}-]*\s*[(\[]/giu;
+  const pattern=/(?:[\p{L}-]*(?:liemijauhe|liemitiiviste|liemi|aromi|gelatiini)[\p{L}-]*|(?:chicken|beef|pork|turkey|poultry|meat)\s+(?:stock|broth|bouillon|flavou?r(?:ing)?)(?:\s+powder)?)\s*[(\[]/giu;
   let out='',last=0,match;
   while((match=pattern.exec(text))){
     out+=text.slice(last,match.index);let i=pattern.lastIndex,depth=1;
@@ -52,15 +54,15 @@ function searchableMeatText(text) {
     .replace(/porkkana[\p{L}-]*|kanad[\p{L}-]*|kanan?mun[\p{L}-]*|kananrasv[\p{L}-]*|lihan?korvik[\p{L}-]*|härkäpap[\p{L}-]*/giu,' ')
     .replace(/(?:kasvis|kasvi|vege|vego|soija|herne|vegaan)[\p{L}-]*?(?:makkara|liha|pekoni|kana|chorizo|pepperoni|bratwurst)[\p{L}-]*/giu,' ')
     .replace(/[\p{L}-]*(?:liemijauhe|liemitiiviste|liemi|aromi)[\p{L}-]*/giu,' ')
-    .replace(/(?:chicken|beef|pork)\s+(?:stock|broth|flavou?r)[\p{L}-]*/giu,' ');
+    .replace(/\b(?:chicken|beef|pork|turkey|poultry)\s+(?:fat|stock|broth|bouillon|flavou?r(?:ing)?)(?:\s+powder)?\b/giu,' ');
 }
 const MEAT_WORDS=[
   ['鸡肉',/(?:broiler[\p{L}-]*|kana[\p{L}-]*|\bchicken\b)/iu],
   ['猪肉',/(?:pors[\p{L}-]*|possu[\p{L}-]*|sianliha[\p{L}-]*|kinkku[\p{L}-]*|pekoni[\p{L}-]*|\bpork\b|\bbacon\b|\bham\b)/iu],
-  ['牛肉',/(?:naudan\s*(?:liha|filee|paisti|pihvi|jauhe|suikale)[\p{L}-]*|nauta(?:liha|filee|paisti|pihvi|jauhe|suikale)[\p{L}-]*|häränliha[\p{L}-]*|\bbeef\b)/iu],
+  ['牛肉',/(?:naudan\s*(?:liha|filee|paisti|pihvi|jauhe|suikale)[\p{L}-]*|nauta(?:liha|filee|paisti|pihvi|jauhe|suikale)[\p{L}-]*|häränliha[\p{L}-]*|\b(?:beef|veal)\b)/iu],
   ['火鸡肉',/(?:kalkkun[\p{L}-]*|\bturkey\b)/iu],
   ['羊肉',/(?:lammas(?!maito|juusto)[\p{L}-]*|lampaan\s*(?:liha|filee|paisti|pihvi|jauhe|suikale)[\p{L}-]*|karitsa[\p{L}-]*|\blamb\b)/iu],
-  ['其他肉类',/(?:jauheliha[\p{L}-]*|(?:^|[^\p{L}])liha(?:pull|pyöryk|kastik|suikale|piirak|mureke|pihv|pala)[\p{L}-]*|\bmeat\b)/iu]
+  ['其他肉类',/(?:jauheliha[\p{L}-]*|(?:^|[^\p{L}])liha(?:pull|pyöryk|kastik|suikale|piirak|mureke|pihv|pala)[\p{L}-]*|\b(?:meat(?:balls?|loaf)?|poultry|duck|reindeer|venison)\b)/iu]
 ];
 function findMeat(text){
   const cleaned=searchableMeatText(text);
@@ -73,7 +75,7 @@ export function detectMeat(dish) {
   if(['Makeasti','Jälkiruoka'].includes(String(dish.price?.name||'')))return {status:'excluded',reason:'官方甜点'};
   const title=String(dish.name||'');
   // An explicit plant-based name without an official flag is ambiguous, not a meat hit.
-  const explicitlyPlantBased=/(?:vegaan|vegan|plant[- ]based|kasvipohjainen|lihattom)/iu.test(title);
+  const explicitlyPlantBased=/(?:vegaan|vegan|vegetarian|veggie|plant[- ]based|meat[- ]?free|meatless|kasvipohjainen|lihattom|kanaton)/iu.test(title);
   const ingredientHit=explicitlyPlantBased?null:findMeat(dish.ingredients);
   const titleHit=explicitlyPlantBased?null:findMeat(title);
   if(titleHit)return {status:'identified',source:'菜名',...titleHit};
@@ -82,7 +84,11 @@ export function detectMeat(dish) {
   return {status:orange?'uncertain':'excluded',reason:orange?'没有明确肉类线索':'其他菜单类别'};
 }
 
-const WEEKDAYS=['ma','ti','ke','to','pe','la','su'];
+const WEEKDAYS=new Map([
+  ['ma',0],['mon',0],['monday',0],['ti',1],['tue',1],['tues',1],['tuesday',1],
+  ['ke',2],['wed',2],['wednesday',2],['to',3],['thu',3],['thur',3],['thurs',3],['thursday',3],
+  ['pe',4],['fri',4],['friday',4],['la',5],['sat',5],['saturday',5],['su',6],['sun',6],['sunday',6]
+]);
 function validMonthDay(day,month) {
   const d=new Date(Date.UTC(2024,month-1,day));
   return month>=1&&month<=12&&day>=1&&d.getUTCMonth()===month-1&&d.getUTCDate()===day;
@@ -112,9 +118,10 @@ function matchesException(label,iso) {
   return null;
 }
 function matchesWeekday(label,weekday){
-  const m=String(label||'').trim().toLowerCase().match(/^(ma|ti|ke|to|pe|la|su)(?:\s*[-–—]\s*(ma|ti|ke|to|pe|la|su))?$/);
+  const m=String(label||'').trim().toLowerCase().match(/^([a-z]+)(?:\s*[-–—]\s*([a-z]+))?$/);
   if(!m)return false;
-  const start=WEEKDAYS.indexOf(m[1]),end=m[2]?WEEKDAYS.indexOf(m[2]):start;
+  const start=WEEKDAYS.get(m[1]),end=m[2]?WEEKDAYS.get(m[2]):start;
+  if(start===undefined||end===undefined)return false;
   return start<=end?weekday>=start&&weekday<=end:weekday>=start||weekday<=end;
 }
 function describeLunch(item,exception){
@@ -156,29 +163,32 @@ export function formatLunchHours(hours,minutes){
   return `${hours.label} · ${moment}`;
 }
 
-// Keep uncertain dishes and unknown hours visible: neither means meat-free or closed.
-export function shouldDisplayRestaurant(restaurant,minutes){
-  const dishes=Array.isArray(restaurant?.dishes)?restaurant.dishes:[];
-  if(!dishes.some(d=>d?.meat?.status==='identified'||d?.meat?.status==='uncertain'||d?.fish===true))return false;
+// Keep restaurants with unknown hours and upcoming lunch in the day's view.
+function isLunchAvailable(restaurant,minutes){
   const hours=restaurant?.lunchHours;
   if(hours?.status==='closed')return false;
   if(['regular','exception'].includes(hours?.status)&&Number.isInteger(hours.endMinutes)&&hours.endMinutes>=0&&hours.endMinutes<1440&&Number.isInteger(minutes)&&minutes>=0&&minutes<1440)return minutes<hours.endMinutes;
   return true;
 }
 
-// Called only when the filtered list is empty. Always inspect the complete
-// day's menus so hiding restaurants after lunch cannot imply a vegan day.
-export function emptyMenuState(records){
-  const dishes=(Array.isArray(records)?records:[]).flatMap(r=>Array.isArray(r?.dishes)?r.dishes:[]);
-  if(!dishes.length)return {kind:'no-menu',title:'今天暂无菜单信息',detail:'官方菜单可能尚未更新，或食堂暂停营业。'};
-  if(dishes.some(d=>d?.meat?.status==='identified'||d?.meat?.status==='uncertain'||d?.fish===true))
-    return {kind:'lunch-ended',title:'当前没有可显示的食堂',detail:'相关食堂的午餐时段已结束或暂停营业。'};
-  const isUncertain=d=>!d||d.fish!==false||d.meat?.status!=='excluded';
-  if(dishes.every(d=>!isUncertain(d)&&d.marks?.vegan===true))
-    return {kind:'possible-vegan-day',title:'今天暂未发现肉或鱼',detail:'已获取的菜品均标为纯素，可能是 Vegan Day；请以 UniCafe 官网为准。'};
-  if(dishes.every(d=>!isUncertain(d)&&(d.marks?.vegan===true||d.marks?.vegetarian===true)))
-    return {kind:'vegetarian',title:'今天暂未发现肉或鱼',detail:'已获取的菜品均标为素食，请以 UniCafe 官网为准。'};
-  return {kind:'no-match',title:'今天暂未识别到肉或鱼',detail:'部分菜品或菜单信息尚不完整，请以 UniCafe 官网为准。'};
+// Keep uncertain dishes and unknown hours visible: neither means meat-free or closed.
+export function shouldDisplayRestaurant(restaurant,minutes){
+  const dishes=Array.isArray(restaurant?.dishes)?restaurant.dishes:[];
+  return isLunchAvailable(restaurant,minutes)&&dishes.some(d=>d?.meat?.status==='identified'||d?.meat?.status==='uncertain'||d?.fish===true);
+}
+
+// The message concerns the remaining menus, independently of dishes that need review.
+export function emptyMenuState(records,minutes){
+  const all=Array.isArray(records)?records:[];
+  const candidates=all.filter(r=>isLunchAvailable(r,minutes));
+  const dishes=candidates.flatMap(r=>Array.isArray(r?.dishes)?r.dishes:[]);
+  if(!dishes.length){
+    if(!candidates.length&&all.some(r=>r?.dishes?.length))
+      return {kind:'lunch-ended',title:'当前没有可显示的食堂',detail:'午餐时段已结束或食堂暂停营业。'};
+    return {kind:'no-menu',title:'今天暂无菜单信息',detail:'官方菜单可能尚未更新，或食堂暂停营业。'};
+  }
+  if(dishes.some(d=>d?.meat?.status==='identified'||d?.fish===true))return null;
+  return {kind:'no-match',title:'今天暂未发现肉或鱼'};
 }
 
 // The official site's query parameter selects the restaurant. The old
@@ -190,21 +200,15 @@ export function officialRestaurantUrl(slug){
   return url.href;
 }
 
-export function buildRecords(fi, en, token, iso=todayParts().iso) {
-  const english=new Map((en||[]).map(r=>[r.slug,r]));
-  return fi.map(r=>{
+export function buildRecords(restaurants, token, iso=todayParts().iso) {
+  return restaurants.map(r=>{
     const menu=(r.menuData?.menus||[]).find(m=>String(m.date||'').includes(token));
-    const other=english.get(r.slug);
-    const enMenu=(other?.menuData?.menus||[]).find(m=>String(m.date||'').includes(token));
-    const fiDishes=menu?.data||[];
-    const enDishes=(enMenu?.data||[]).length===fiDishes.length ? (enMenu?.data||[]) : [];
-    const dishes=fiDishes.map((d,i)=>{
+    const dishes=(menu?.data||[]).map(d=>{
       if(!d?.name)return null;
-      const original=String(d.name).trim(), enName=String(enDishes?.[i]?.name||'').trim();
-      const language=enName&&enName.toLocaleLowerCase()!==original.toLocaleLowerCase()?'en':'fi';
+      const original=String(d.name).trim();
       const marks=officialMarks(d);
-      return {original,enName,language,text:language==='en'?enName:original,meat:detectMeat(d),fish:marks.containsFish||marks.containsCrustaceans||marks.containsMolluscs,marks};
+      return {original,meat:detectMeat(d),fish:marks.containsFish||marks.containsCrustaceans||marks.containsMolluscs,marks};
     }).filter(Boolean);
-    return {slug:r.slug,name:r.title,campus:r.location?.[0]?.name||'Muut',address:r.address||r.menuData?.address||'',staff:/henkilöstö|opettajien/i.test(r.title||''),lunchHours:resolveTodayLunchHours(r.menuData?.visitingHours,iso),dishes};
+    return {slug:r.slug,name:r.title,campus:r.location?.[0]?.name||'Muut',address:r.address||r.menuData?.address||'',staff:/henkilöstö|opettajien|\bstaff\b|\bteachers?\b/i.test(r.title||''),lunchHours:resolveTodayLunchHours(r.menuData?.visitingHours,iso),dishes};
   });
 }

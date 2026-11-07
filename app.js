@@ -1,38 +1,20 @@
 import {CAMPUS_NAMES,todayParts,helsinkiMinutes,formatLunchHours,shouldDisplayRestaurant,emptyMenuState,officialRestaurantUrl,buildRecords} from './menu.mjs';
-import {localDishTranslation,isUsableChineseTranslation,inspectTranslationResponse,translateQueue} from './translation.mjs';
+import {hasFinnishMenuWording,localDishTranslation,isUsableChineseTranslation} from './translation.mjs';
 const API='https://unicafe.fi/wp-json/swiss/v1/restaurants';
-const CACHE='campus-lunch-cn-v2';
 const content=document.querySelector('#content'), status=document.querySelector('#status'), dateNode=document.querySelector('#today'), refreshButton=document.querySelector('#refresh');
-let records=[], translations={}, currentDate='', translating=false, run=0, translationBlockedUntil=0, translationRefreshPending=false, visibleSignature='';
-let translationBindings=new Map(), hourBindings=[];
+let records=[], translations={}, currentDate='', run=0, visibleSignature='';
+let hourBindings=[];
 const expandedCampuses=new Set();
 const expandedPending=new Set();
 const expandedRestaurants=new Set();
-try {const cached=JSON.parse(localStorage.getItem(CACHE)||'{}');if(cached&&typeof cached==='object'&&!Array.isArray(cached))translations=cached;} catch {}
 function el(tag,cls,text){const node=document.createElement(tag);if(cls)node.className=cls;if(text!==undefined)node.textContent=text;return node;}
 function setStatus(message, fresh=false){status.replaceChildren();const dot=el('span',fresh?'status-dot ready':'status-dot');status.append(dot,document.createTextNode(' '+message));}
-function key(d){return `${d.language}:${d.text}`;}
-function improveTranslation(d, text){
-  if (!text) return text;
-  if (/muikku|vendace/i.test(`${d.original} ${d.enName}`)) text=text.replace(/摊贩|小吃/g,'白鲑鱼');
-  if (/broiler|chicken|kana/i.test(`${d.original} ${d.enName}`)) text=text.replace(/肉鸡/g,'鸡肉');
-  return text;
-}
 function translationFor(dish){
+  if(hasFinnishMenuWording(dish.original))return '';
   const local=localDishTranslation(dish.original);
   if(local)return local;
-  const cached=translations[key(dish)];
-  return isUsableChineseTranslation(cached)?improveTranslation(dish,cached):'';
-}
-function updateTranslation(binding){
-  const {dish,title,original,note}=binding,translated=translationFor(dish),fallback=dish.enName||dish.original;
-  title.textContent=translated||fallback;
-  original.textContent=(translated||fallback!==dish.original)?dish.original:'';
-  note.textContent=translated?'':translating?'翻译中…':'中文暂不可用';
-}
-function refreshTranslations(onlyKey){
-  if(onlyKey){for(const binding of translationBindings.get(onlyKey)||[])updateTranslation(binding);return;}
-  for(const bindings of translationBindings.values())for(const binding of bindings)updateTranslation(binding);
+  const cached=Object.hasOwn(translations,dish.original)?translations[dish.original]:'';
+  return isUsableChineseTranslation(cached)?cached:'';
 }
 function updateLunchTimes(){
   const minutes=helsinkiMinutes();
@@ -43,26 +25,28 @@ function updateLunchTimes(){
   }
 }
 function visibleRestaurants(){const minutes=helsinkiMinutes();return records.filter(r=>shouldDisplayRestaurant(r,minutes));}
-function signature(list){return JSON.stringify(list.map(r=>r.slug));}
+function signature(list){return JSON.stringify([list.map(r=>r.slug),emptyMenuState(records,helsinkiMinutes())?.kind]);}
 function renderDish(dish, kind){
-  const item=el('li','dish'),title=el('span','dish-name');item.append(title);
+  const translated=translationFor(dish),untranslatedFinnish=hasFinnishMenuWording(dish.original);
+  const item=el('li','dish'),title=el('span','dish-name',untranslatedFinnish?'英文菜名暂不可确认':translated||dish.original);item.append(title);
   if(kind==='meat' && dish.meat.status==='identified')item.append(el('span','evidence',dish.meat.source==='菜名'?dish.meat.animal:`配料含肉（${dish.meat.animal}）`));
   if(kind==='fish'){
     const labels=[];if(dish.marks.containsFish)labels.push('鱼');if(dish.marks.containsCrustaceans)labels.push('甲壳类');if(dish.marks.containsMolluscs)labels.push('贝类');
     item.append(el('span','evidence',`官方标记：${labels.join(' / ')}`));
   }
   const original=el('span','original'),note=el('span','untranslated');item.append(original,note);
-  const binding={dish,title,original,note}, k=key(dish);
-  if(!translationBindings.has(k))translationBindings.set(k,[]);
-  translationBindings.get(k).push(binding);updateTranslation(binding);
+  original.textContent=translated?dish.original:'';
+  note.textContent=untranslatedFinnish?'请查看 UniCafe 官网':translated?'':'中文待更新';
   return item;
 }
 function render(){
-  content.replaceChildren();translationBindings=new Map();hourBindings=[];
+  content.replaceChildren();hourBindings=[];
   const visible=visibleRestaurants();visibleSignature=signature(visible);
   const groups=Object.keys(CAMPUS_NAMES).filter(c=>visible.some(r=>r.campus===c));
   for(const group of [...new Set(visible.map(x=>x.campus))])if(!groups.includes(group))groups.push(group);
   content.classList.toggle('single-campus',groups.length===1);
+  const result=emptyMenuState(records,helsinkiMinutes());
+  if(groups.length&&result?.kind==='no-match')content.append(el('p','no-results-note',result.title));
   for(const campus of groups){
     const list=visible.filter(r=>r.campus===campus);
     const meatCount=list.filter(r=>r.dishes.some(d=>d.meat.status==='identified')).length;
@@ -75,7 +59,7 @@ function render(){
       if(section.open)expandedCampuses.add(campus);else expandedCampuses.delete(campus);
     });
     const header=el('summary','campus-heading');
-    header.append(el('h2','campus-title',`${CAMPUS_NAMES[campus]||campus}${campus==='Keskusta'?'校区':''}`));
+    header.append(el('h2','campus-title',`${CAMPUS_NAMES[campus]||campus}${campus==='Keskusta'||campus==='City Centre'?'校区':''}`));
     const meta=el('span','campus-meta');const counts=el('span','campus-summary');
     const meat=el('span','count count-meat');meat.append(el('i','dot meat'),el('span','count-label','肉类'),el('strong','count-number',`${meatCount} 家`));
     const fish=el('span','count count-fish');fish.append(el('i','dot fish'),el('span','count-label','鱼 / 海鲜'),el('strong','count-number',`${fishCount} 家`));
@@ -125,69 +109,42 @@ function render(){
     }
     table.append(tbody);section.append(table);content.append(section);
   }
-  if(!groups.length){const result=emptyMenuState(records),empty=el('div','state');empty.append(el('h3','',result.title),el('p','',result.detail));content.append(empty);}
+  if(!groups.length){const state=result||{title:'当前没有可显示的食堂'},empty=el('div','state');empty.append(el('h3','',state.title));if(state.detail)empty.append(el('p','',state.detail));content.append(empty);}
   updateLunchTimes();
 }
-function decode(s){const t=document.createElement('textarea');t.innerHTML=s;return t.value;}
-async function translateAll(version){
-  const needed=new Map();
-  for(const r of visibleRestaurants())for(const d of r.dishes)if((d.meat.status==='identified'||d.meat.status==='uncertain'||d.fish)&&!translationFor(d))needed.set(key(d),{cacheKey:key(d),text:d.text,language:d.language});
-  if(!needed.size||Date.now()<translationBlockedUntil)return;
-  translating=true;refreshTranslations();
-  const startSignature=visibleSignature;
-  const outcome=await translateQueue([...needed.values()],{
-    shouldContinue:()=>version===run&&startSignature===visibleSignature,
-    request:async item=>{
-      if(new TextEncoder().encode(item.text).length>500)return {status:'invalid'};
-      const params=new URLSearchParams({q:item.text,langpair:`${item.language}|zh-CN`});
-      const response=await fetch(`https://api.mymemory.translated.net/get?${params}`,{signal:AbortSignal.timeout(12000)});
-      if(response.status===429)return {status:'quota'};
-      if(!response.ok)return {status:response.status>=500?'unavailable':'invalid'};
-      const data=await response.json();return inspectTranslationResponse(data,response.status,decode);
-    },
-    onResult:(item,text)=>{
-      translations[item.cacheKey]=text;
-      try{localStorage.setItem(CACHE,JSON.stringify(translations));}catch{}
-      refreshTranslations(item.cacheKey);
-    }
-  });
-  if(version!==run)return;
-  if(outcome.quota)translationBlockedUntil=Date.now()+60*60*1000;
-  else if(outcome.unavailable)translationBlockedUntil=Date.now()+5*60*1000;
-  translating=false;refreshTranslations();
-  if(translationRefreshPending){translationRefreshPending=false;requestTranslations(version);}
-}
-function requestTranslations(version){
-  if(version!==run)return;
-  if(translating){translationRefreshPending=true;return;}
-  translateAll(version).catch(()=>{if(version===run){translating=false;translationRefreshPending=false;refreshTranslations();}});
+async function loadTranslations(){
+  try{
+    const response=await fetch(new URL('./data/translations.json',import.meta.url),{cache:'no-store',signal:AbortSignal.timeout(10000)});
+    if(!response.ok)return {};
+    const data=await response.json();
+    return data?.translations&&typeof data.translations==='object'&&!Array.isArray(data.translations)?data.translations:{};
+  }catch{return {};}
 }
 async function load(){
-  const version=++run;translating=false;translationRefreshPending=false;const today=todayParts();currentDate=today.iso;
+  const version=++run;const today=todayParts();currentDate=today.iso;
   dateNode.textContent=new Intl.DateTimeFormat('zh-CN',{timeZone:'Europe/Helsinki',month:'long',day:'numeric',weekday:'long'}).format(new Date());
   setStatus('正在获取官方菜单…');refreshButton.disabled=true;
   content.innerHTML='<div class="state"><div class="spinner"></div><h3>正在查看今天的菜单</h3><p>从 UniCafe 获取最新信息…</p></div>';
   try{
-    async function get(language){const response=await fetch(`${API}?lang=${language}`,{cache:'no-store',signal:AbortSignal.timeout(25000)});if(!response.ok)throw Error('menu');const value=await response.json();if(!Array.isArray(value))throw Error('menu');return value;}
-    const [fi,en]=await Promise.all([get('fi'),get('en').catch(()=>[])]);
+    const [response,prepared]=await Promise.all([
+      fetch(`${API}?lang=en`,{cache:'no-store',signal:AbortSignal.timeout(25000)}),
+      loadTranslations()
+    ]);
+    if(!response.ok)throw Error('menu');
+    const en=await response.json();if(!Array.isArray(en))throw Error('menu');
     if(version!==run)return;
-    records=buildRecords(fi,en,today.token,today.iso);render();
+    translations=prepared;records=buildRecords(en,today.token,today.iso);render();
     const time=new Intl.DateTimeFormat('zh-CN',{timeZone:'Europe/Helsinki',hour:'2-digit',minute:'2-digit'}).format(new Date());
-    setStatus(`已更新 ${time}`,true);requestTranslations(version);
+    setStatus(`已更新 ${time}`,true);
   }catch{
     if(version!==run)return;setStatus('菜单暂时无法获取');content.innerHTML='<div class="state error"><div class="state-icon">!</div><h3>暂时无法获取菜单</h3><p>请稍后点击“刷新菜单”，也可以直接查看 UniCafe 官网。</p></div>';
   }finally{if(version===run)refreshButton.disabled=false;}
 }
-document.querySelector('#original-toggle').addEventListener('click',event=>{
-  const button=event.currentTarget;const shown=button.getAttribute('aria-pressed')!=='true';
-  button.setAttribute('aria-pressed',String(shown));button.textContent=shown?'隐藏芬兰语':'显示芬兰语';
-  document.body.classList.toggle('show-original',shown);
-});
 refreshButton.addEventListener('click',load);load();
 function updateDateAndTime(){
   if(todayParts().iso!==currentDate){load();return;}
   if(refreshButton.disabled)return;
-  if(signature(visibleRestaurants())!==visibleSignature){render();requestTranslations(run);}
+  if(signature(visibleRestaurants())!==visibleSignature)render();
   else updateLunchTimes();
 }
 setInterval(updateDateAndTime,60000);
