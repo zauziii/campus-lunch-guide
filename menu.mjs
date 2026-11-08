@@ -3,6 +3,16 @@ export function todayParts(now=new Date()) {
   const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Helsinki',year:'numeric',month:'2-digit',day:'2-digit',weekday:'short'}).formatToParts(now).filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
   return {...parts,iso:`${parts.year}-${parts.month}-${parts.day}`, token:`${parts.day}.${parts.month}.`};
 }
+// Move by calendar days after determining the Helsinki date. Using UTC noon
+// avoids daylight-saving transitions changing the selected calendar date.
+export function shiftDateParts(iso,offset=0){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(String(iso))||!Number.isInteger(offset))throw new RangeError('Invalid menu date');
+  const date=new Date(`${iso}T12:00:00Z`);
+  if(Number.isNaN(date.getTime())||date.toISOString().slice(0,10)!==iso)throw new RangeError('Invalid menu date');
+  date.setUTCDate(date.getUTCDate()+offset);
+  const selected=date.toISOString().slice(0,10);
+  return {iso:selected,token:`${selected.slice(8,10)}.${selected.slice(5,7)}.`};
+}
 export function helsinkiMinutes(now=new Date()) {
   const parts=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Helsinki',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(now).filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
   return Number(parts.hour)*60+Number(parts.minute);

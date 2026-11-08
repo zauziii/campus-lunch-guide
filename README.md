@@ -1,14 +1,14 @@
-# Campus Lunch Guide
+# 吃好饭 · Chi Hao Fan
 
-An independent guide to today's meat and fish options at UniCafe and Aalto Otaniemi restaurants, with Chinese translations. The University of Helsinki is selected by default; use the switch at the top to see Aalto.
+An independent guide to meat and fish options at UniCafe and Aalto Otaniemi restaurants, with Chinese translations. The University of Helsinki and today's Helsinki date are selected by default; use the switches to view Aalto or tomorrow's published menu.
 
 ## How it works
 
-- **UniCafe:** The browser loads UniCafe's English menu feed and refreshes it every 15 minutes while the page is open. It uses the current Helsinki date and the published lunch schedule.
+- **UniCafe:** The browser loads UniCafe's English menu feed and refreshes it every 15 minutes while the page is open. Date selection uses Helsinki local time and the published menu and lunch schedule for that day.
 - **Aalto / Otaniemi:** GitHub Actions collects the Otaniemi restaurant list and menus from Kanttiinit, and looks for more detailed menus at the restaurants' official sources. The resulting snapshot is published alongside the translations. The page shows when it was collected and warns when sources or today's menus are missing. Restaurant names link to their own official sites; see [Aalto sources](AALTO_SOURCES.md).
 - **Meat and fish:** Official recipe or ingredient information is used where it is available. Otherwise explicit meat or fish names are identified from the dish title, and the page identifies the evidence used. UniCafe fish is based on official allergen fields. A dish that cannot be classified remains “待确认”; this does not mean it contains no meat or fish. Translation never determines classification.
-- Restaurants with known ended lunch times and restaurants without relevant dishes are hidden. Unknown hours and uncertain dishes remain visible. Some Aalto entries only provide general weekly opening hours, which are marked as a regular reference and may differ from the actual lunch period or exceptional hours.
-- English names and Chinese translations appear together. GitHub Actions translates new relevant English names with Azure Translator and caches them. The existing local dictionary takes precedence; the Azure key is never exposed to the website. When a title appears to be Finnish, the original name remains visible. Finnish names that can be identified as such are not sent for translation as English.
+- For today, restaurants with known ended lunch times and restaurants without relevant dishes are hidden. Tomorrow's published menus are not hidden according to the current clock time. Unknown hours and uncertain dishes remain visible. Some Aalto entries only provide general weekly opening hours, which are marked as a regular reference and may differ from the actual lunch period or exceptional hours.
+- English names and Chinese translations appear together. GitHub Actions translates new relevant English names with Azure Translator and caches them. The existing local dictionary takes precedence over cached translations, including the corrected shiitake, parmesan and rucola pizza; the Azure key is never exposed to the website. When a title appears to be Finnish, the original name remains visible. Finnish names that can be identified as such are not sent for translation as English.
 
 ## Updating and publishing
 

@@ -6,6 +6,7 @@ const COMMON_DISHES=[
   ['Butter chicken','黄油鸡肉'],
   ['Saithe in pesto sauce','青鳕配罗勒酱'],
   ['Lemon fish with orange remoulade','柠檬鱼配橙香雷莫兰酱'],
+  ['Shiitake and parmesan pizza, truffle oil and rucola','香菇帕尔马奶酪披萨，配松露油和芝麻菜'],
   ['Tuna Bowl','金枪鱼碗']
 ];
 function normalize(value){return String(value||'').normalize('NFKC').trim().replace(/\s+/g,' ').toLocaleLowerCase('en');}

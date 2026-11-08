@@ -17,6 +17,8 @@ test('local overrides are exact, including the two confirmed fish dishes',()=>{
   assert.equal(localDishTranslation('Chicken bolognese and salad'),'');
   assert.equal(localDishTranslation('Saithe in pesto sauce'),'青鳕配罗勒酱');
   assert.equal(localDishTranslation('Lemon fish with orange remoulade'),'柠檬鱼配橙香雷莫兰酱');
+  assert.equal(localDishTranslation('Shiitake and parmesan pizza, truffle oil and rucola'),'香菇帕尔马奶酪披萨，配松露油和芝麻菜');
+  assert.equal(hasFinnishMenuWording('Shiitake and parmesan pizza, truffle oil and rucola'),false);
 });
 
 test('clearly Finnish titles are not sent as English',()=>{
