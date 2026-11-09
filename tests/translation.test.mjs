@@ -9,7 +9,7 @@ const restaurants=[{menuData:{menus:[{date:'Mon 09.11.',data:[
   {name:'Chicken and rice',ingredients:'chicken, rice'},
   {name:'Saithe in pesto sauce',meta:{1:['Fish']}},
   {name:'Seitä pestokastikkeessa',meta:{1:['Fish']}},
-  {name:'Lihapullia Mac & Cheese'},
+  {name:'Chicken ja peruna'},
   {name:'Kermainen savulohikeitto',meta:{1:['Fish']}},
   {name:'Tofu and vegetables',meta:{0:['Veg']}}
 ]}]}}];
@@ -20,20 +20,25 @@ test('local overrides are exact, including the two confirmed fish dishes',()=>{
   assert.equal(localDishTranslation('Saithe in pesto sauce'),'青鳕配罗勒酱');
   assert.equal(localDishTranslation('Lemon fish with orange remoulade'),'柠檬鱼配橙香雷莫兰酱');
   assert.equal(localDishTranslation('Shiitake and parmesan pizza, truffle oil and rucola'),'香菇帕尔马奶酪披萨，配松露油和芝麻菜');
+  assert.equal(localDishTranslation('Lihapullia Mac & Cheese'),'肉丸芝士通心粉');
+  assert.equal(localDishTranslation('Satay - Kana Bowl'),'沙爹鸡肉碗');
 });
 
 test('queues relevant English, Finnish and mixed titles while skipping cached local overrides',()=>{
   assert.deepEqual(collectDishNames(restaurants),[
     'Chicken and rice','Salmon soup','Seitä pestokastikkeessa',
-    'Lihapullia Mac & Cheese','Kermainen savulohikeitto'
+    'Chicken ja peruna','Kermainen savulohikeitto'
   ]);
 });
 
 test('displays valid cached translations for Finnish and mixed titles, or falls back to the original',()=>{
-  const cached={'Kermainen savulohikeitto':'奶油烟熏三文鱼汤','Lihapullia Mac & Cheese':'肉丸配芝士通心粉',
+  const cached={'Kermainen savulohikeitto':'奶油烟熏三文鱼汤','Chicken ja peruna':'鸡肉配土豆',
+    'Lihapullia Mac & Cheese':'利哈普利亚奶酪通心粉',
     'Saithe in pesto sauce':'不应覆盖的旧翻译','Missing':'translation failed'};
   assert.equal(dishTranslation('Kermainen savulohikeitto',cached),'奶油烟熏三文鱼汤');
-  assert.equal(dishTranslation('Lihapullia Mac & Cheese',cached),'肉丸配芝士通心粉');
+  assert.equal(dishTranslation('Chicken ja peruna',cached),'鸡肉配土豆');
+  assert.equal(dishTranslation('Lihapullia Mac & Cheese',cached),'肉丸芝士通心粉');
+  assert.equal(dishTranslation('Satay - Kana Bowl',cached),'沙爹鸡肉碗');
   assert.equal(dishTranslation('Saithe in pesto sauce',cached),'青鳕配罗勒酱');
   assert.equal(dishTranslation('Missing',cached),'');
   assert.equal(dishTranslation('Not yet translated',cached),'');
@@ -43,7 +48,7 @@ test('Azure is called only for uncached relevant dishes with the regional header
   let request;
   const result=await buildCache({restaurants,previous:{translations:{'Chicken and rice':'鸡肉配米饭'}},key:'test-key',region:'northeurope',now:new Date('2026-11-07T03:00:00Z'),fetchImpl:async(url,options)=>{
     request={url,options};
-    return {ok:true,json:async()=>['三文鱼汤','青鳕配罗勒酱','肉丸配芝士通心粉','奶油烟熏三文鱼汤'].map(text=>({translations:[{text,to:'zh-Hans'}]}))};
+    return {ok:true,json:async()=>['三文鱼汤','青鳕配罗勒酱','鸡肉配土豆','奶油烟熏三文鱼汤'].map(text=>({translations:[{text,to:'zh-Hans'}]}))};
   }});
   const url=new URL(request.url);
   assert.equal(url.searchParams.has('from'),false);
@@ -52,11 +57,11 @@ test('Azure is called only for uncached relevant dishes with the regional header
   assert.equal(request.options.headers['Ocp-Apim-Subscription-Key'],'test-key');
   assert.deepEqual(JSON.parse(request.options.body),[
     {Text:'Salmon soup'},{Text:'Seitä pestokastikkeessa'},
-    {Text:'Lihapullia Mac & Cheese'},{Text:'Kermainen savulohikeitto'}
+    {Text:'Chicken ja peruna'},{Text:'Kermainen savulohikeitto'}
   ]);
   assert.equal(result.translations['Chicken and rice'],'鸡肉配米饭');
   assert.equal(result.translations['Salmon soup'],'三文鱼汤');
-  assert.equal(result.translations['Lihapullia Mac & Cheese'],'肉丸配芝士通心粉');
+  assert.equal(result.translations['Chicken ja peruna'],'鸡肉配土豆');
   assert.equal(result.translations['Kermainen savulohikeitto'],'奶油烟熏三文鱼汤');
   assert.equal(result.stats.added,4);
   assert.equal(result.updatedAt,'2026-11-07T03:00:00.000Z');

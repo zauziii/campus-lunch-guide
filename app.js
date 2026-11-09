@@ -1,5 +1,5 @@
 import {CAMPUS_NAMES,todayParts,shiftDateParts,helsinkiMinutes,formatLunchHours,shouldDisplayRestaurant,emptyMenuState,officialRestaurantUrl,buildRecords,buildAaltoRecords} from './menu.mjs?v=20261108c';
-import {dishTranslation} from './translation.mjs?v=20261109a';
+import {dishTranslation} from './translation.mjs?v=20261109b';
 const API='https://unicafe.fi/wp-json/swiss/v1/restaurants';
 const content=document.querySelector('#content'), status=document.querySelector('#status'), dateNode=document.querySelector('#today'), refreshButton=document.querySelector('#refresh');
 let records=[], translations={}, currentDate='', run=0, visibleSignature='', university='helsinki', sourceWarning='', sourceIncomplete=false, dayOffset=0;
