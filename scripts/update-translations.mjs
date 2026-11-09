@@ -4,10 +4,12 @@ import {promisify} from 'node:util';
 import {dirname,resolve} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {detectMeat,officialMarks,classifyAaltoDish} from '../menu.mjs';
-import {hasFinnishMenuWording,isUsableChineseTranslation,localDishTranslation} from '../translation.mjs';
+import {isUsableChineseTranslation,localDishTranslation} from '../translation.mjs';
 
 const MENU_URL='https://unicafe.fi/wp-json/swiss/v1/restaurants?lang=en';
-const TRANSLATE_URL='https://api.cognitive.microsofttranslator.com/translate?api-version=3.0&from=en&to=zh-Hans';
+// Without `from`, Azure detects the source language of each text. UniCafe's
+// English feed can include Finnish or mixed-language titles.
+const TRANSLATE_URL='https://api.cognitive.microsofttranslator.com/translate?api-version=3.0&to=zh-Hans';
 const CACHE_PATH=fileURLToPath(new URL('../data/translations.json',import.meta.url));
 const AALTO_COLLECTOR=fileURLToPath(new URL('./collect-aalto.py',import.meta.url));
 const runFile=promisify(execFile);
@@ -21,7 +23,7 @@ export function collectDishNames(restaurants){
     for(const menu of Array.isArray(restaurant?.menuData?.menus)?restaurant.menuData.menus:[]){
       for(const dish of Array.isArray(menu?.data)?menu.data:[]){
         const name=typeof dish?.name==='string'?dish.name.trim():'';
-        if(!name||hasFinnishMenuWording(name)||localDishTranslation(name))continue;
+        if(!name||localDishTranslation(name))continue;
         const meat=detectMeat(dish),marks=officialMarks(dish);
         if(meat.status==='identified'||meat.status==='uncertain'||marks.containsFish||marks.containsCrustaceans||marks.containsMolluscs)names.add(name);
       }
@@ -35,7 +37,7 @@ export function collectAaltoDishNames(snapshot){
   for(const restaurant of Array.isArray(snapshot?.restaurants)?snapshot.restaurants:[]){
     for(const day of Object.values(restaurant?.menus||{}))for(const dish of Array.isArray(day?.dishes)?day.dishes:[]){
       const name=typeof dish?.name==='string'?dish.name.trim():'';
-      if(!name||hasFinnishMenuWording(name)||localDishTranslation(name))continue;
+      if(!name||localDishTranslation(name))continue;
       const classified=classifyAaltoDish(dish);
       if(classified.meat.status==='identified'||classified.meat.status==='uncertain'||classified.fish)names.add(name);
     }

@@ -12,14 +12,15 @@ const COMMON_DISHES=[
 function normalize(value){return String(value||'').normalize('NFKC').trim().replace(/\s+/g,' ').toLocaleLowerCase('en');}
 const COMMON_MAP=new Map(COMMON_DISHES.map(([name,translation])=>[normalize(name),translation]));
 export function localDishTranslation(name){return COMMON_MAP.get(normalize(name))||'';}
-// UniCafe's English feed occasionally returns untranslated Finnish titles.
-// Avoid treating clearly Finnish food words as English; this is conservative
-// and cannot determine the language of every short or mixed-language title.
-export function hasFinnishMenuWording(name){
-  const text=String(name||'').normalize('NFKC').toLowerCase();
-  return /(?:^|[^\p{L}])(?:kana[\p{L}]*|broileri[\p{L}]*|liha[\p{L}]*|jauheliha[\p{L}]*|kermainen|kermaisa|rapeat|peruna[\p{L}]*|kasvis[\p{L}]*|tomaatti[\p{L}]*|sitruuna[\p{L}]*|tonnikala[\p{L}]*|katkarapu[\p{L}]*|ahven[\p{L}]*|kalap[\p{L}]*|savulohi[\p{L}]*|salaatti[\p{L}]*|uunimakkara[\p{L}]*|paistettu[\p{L}]*)/iu.test(text)
-    || /(?:keitto|kastikke|kastiketta|pyöryk|pihvi|kermaviili|salaattijuusto|savulohi|inkivääri|ateria|majoneesi|perunamuussi|porkkanaa)/iu.test(text);
-}
 export function isUsableChineseTranslation(value){
   return typeof value==='string'&&/[\u3400-\u9fff]/u.test(value)&&!/quota exceeded|translation failed/i.test(value);
+}
+
+// Always keep the source name available to the caller. Exact, reviewed local
+// translations take priority over the Azure cache for every source language.
+export function dishTranslation(name,translations={}){
+  const local=localDishTranslation(name);
+  if(local)return local;
+  const cached=translations&&Object.hasOwn(translations,name)?translations[name]:'';
+  return isUsableChineseTranslation(cached)?cached:'';
 }

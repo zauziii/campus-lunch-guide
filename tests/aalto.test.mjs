@@ -53,11 +53,11 @@ test('uses the correct restaurant link and day and respects official lunch hours
   assert.equal(buildAaltoRecords(source,'2026-11-08')[0].dishes.length,0);
 });
 
-test('only sends relevant English Aalto titles to the translation queue',()=>{
+test('queues relevant Aalto titles in Finnish or English for translation',()=>{
   const data={restaurants:[{menus:{'2026-11-09':{dishes:[
     {name:'Chicken and rice'}, {name:'Chicken and rice'},
     {name:'Seitä pestokastikkeessa'}, {name:'Vegan soup',properties:['VV']},
     {name:'Saithe in pesto sauce'}
   ]}}}]};
-  assert.deepEqual(collectAaltoDishNames(data),['Chicken and rice']);
+  assert.deepEqual(collectAaltoDishNames(data),['Chicken and rice','Seitä pestokastikkeessa']);
 });

@@ -18,34 +18,35 @@ concurrency:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    # This is the runner image on which the previous deployment succeeded.
+    runs-on: ubuntu-26.04
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Check out website
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: '22'
+          node-version: '24'
 
       - name: Restore previous translations
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: data/translations.json
           key: campus-lunch-translations-v1-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: campus-lunch-translations-v1-
 
-      - name: Translate new English menu items
+      - name: Translate new menu items
         run: node scripts/update-translations.mjs
         env:
           AZURE_TRANSLATOR_KEY: ${{ secrets.AZURE_TRANSLATOR_KEY }}
           AZURE_TRANSLATOR_REGION: northeurope
 
       - name: Save translation cache
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: data/translations.json
           key: campus-lunch-translations-v1-${{ github.run_id }}-${{ github.run_attempt }}
@@ -57,13 +58,13 @@ jobs:
           cp data/translations.json dist/data/
 
       - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
 
       - name: Upload website
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: dist
 
       - name: Publish website
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

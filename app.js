@@ -1,5 +1,5 @@
 import {CAMPUS_NAMES,todayParts,shiftDateParts,helsinkiMinutes,formatLunchHours,shouldDisplayRestaurant,emptyMenuState,officialRestaurantUrl,buildRecords,buildAaltoRecords} from './menu.mjs?v=20261108c';
-import {hasFinnishMenuWording,localDishTranslation,isUsableChineseTranslation} from './translation.mjs?v=20261108c';
+import {dishTranslation} from './translation.mjs?v=20261109a';
 const API='https://unicafe.fi/wp-json/swiss/v1/restaurants';
 const content=document.querySelector('#content'), status=document.querySelector('#status'), dateNode=document.querySelector('#today'), refreshButton=document.querySelector('#refresh');
 let records=[], translations={}, currentDate='', run=0, visibleSignature='', university='helsinki', sourceWarning='', sourceIncomplete=false, dayOffset=0;
@@ -10,11 +10,7 @@ const expandedRestaurants=new Set();
 function el(tag,cls,text){const node=document.createElement(tag);if(cls)node.className=cls;if(text!==undefined)node.textContent=text;return node;}
 function setStatus(message, fresh=false){status.replaceChildren();const dot=el('span',fresh?'status-dot ready':'status-dot');status.append(dot,document.createTextNode(' '+message));}
 function translationFor(dish){
-  if(hasFinnishMenuWording(dish.original))return '';
-  const local=localDishTranslation(dish.original);
-  if(local)return local;
-  const cached=Object.hasOwn(translations,dish.original)?translations[dish.original]:'';
-  return isUsableChineseTranslation(cached)?cached:'';
+  return dishTranslation(dish.original,translations);
 }
 function updateLunchTimes(){
   const minutes=displayMinutes();
@@ -40,7 +36,7 @@ function selectedMenuState(){
 }
 function signature(list){return JSON.stringify([list.map(r=>r.slug),selectedMenuState()?.kind]);}
 function renderDish(dish, kind){
-  const translated=translationFor(dish),untranslatedFinnish=hasFinnishMenuWording(dish.original);
+  const translated=translationFor(dish);
   const item=el('li','dish'),title=el('span','dish-name',translated||dish.original);item.append(title);
   if(kind==='meat' && dish.meat.status==='identified'){
     const evidence=university==='aalto'?`${dish.meat.source==='食材信息'?'食材信息':'菜名识别'} · ${dish.meat.animal}`:dish.meat.source==='菜名'?dish.meat.animal:`配料含肉（${dish.meat.animal}）`;
@@ -53,7 +49,7 @@ function renderDish(dish, kind){
   }
   const original=el('span','original'),note=el('span','untranslated');item.append(original,note);
   original.textContent=translated?dish.original:'';
-  note.textContent=untranslatedFinnish?'':translated?'':'中文待更新';
+  note.textContent=translated?'':'中文待更新';
   return item;
 }
 function render(){

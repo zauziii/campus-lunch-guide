@@ -8,13 +8,15 @@ An independent guide to meat and fish options at UniCafe and Aalto Otaniemi rest
 - **Aalto / Otaniemi:** GitHub Actions collects the Otaniemi restaurant list and menus from Kanttiinit, and looks for more detailed menus at the restaurants' official sources. The resulting snapshot is published alongside the translations. The page shows when it was collected and warns when sources or today's menus are missing. Restaurant names link to their own official sites; see [Aalto sources](AALTO_SOURCES.md).
 - **Meat and fish:** Official recipe or ingredient information is used where it is available. Otherwise explicit meat or fish names are identified from the dish title, and the page identifies the evidence used. UniCafe fish is based on official allergen fields. A dish that cannot be classified remains “待确认”; this does not mean it contains no meat or fish. Translation never determines classification.
 - For today, restaurants with known ended lunch times and restaurants without relevant dishes are hidden. Tomorrow's published menus are not hidden according to the current clock time. Unknown hours and uncertain dishes remain visible. Some Aalto entries only provide general weekly opening hours, which are marked as a regular reference and may differ from the actual lunch period or exceptional hours.
-- English names and Chinese translations appear together. GitHub Actions translates new relevant English names with Azure Translator and caches them. The existing local dictionary takes precedence over cached translations, including the corrected shiitake, parmesan and rucola pizza; the Azure key is never exposed to the website. When a title appears to be Finnish, the original name remains visible. Finnish names that can be identified as such are not sent for translation as English.
+- Original names and Chinese translations appear together. GitHub Actions translates new relevant menu names with Azure Translator's automatic source-language detection, including Finnish and mixed-language names, and caches them. The local dictionary takes precedence over cached translations, including the corrected shiitake, parmesan and rucola pizza; the Azure key is never exposed to the website. If no usable translation is available, the original name is shown with “中文待更新”. Short or mixed-language names may still be translated incorrectly.
 
 ## Updating and publishing
 
 The existing workflow runs once a day at **05:30 UTC** (normally 07:30 in Finland in winter and 08:30 in summer), on pushes to `main`, and when manually started from **Actions → Update translations and publish → Run workflow**. Scheduled runs can start later than their scheduled time.
 
 The workflow uses the existing `AZURE_TRANSLATOR_KEY` repository secret and region `northeurope`. No new secret is needed for Aalto. The Aalto snapshot is refreshed by the workflow, not by the page's Refresh button; restaurant changes after collection may not appear until the next successful run. UniCafe menus continue to be requested by the browser. If Aalto collection fails, the last cached snapshot is retained when available and marked as an unsuccessful update.
+
+The workflow pins `ubuntu-26.04`, matching the last successful deployment image, and uses Node 24-compatible GitHub Actions. The translation cache key and daily schedule are unchanged.
 
 ## Checks
 
