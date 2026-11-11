@@ -1,4 +1,4 @@
-import {CAMPUS_NAMES,todayParts,shiftDateParts,helsinkiMinutes,formatLunchHours,shouldDisplayRestaurant,emptyMenuState,officialRestaurantUrl,buildRecords,buildAaltoRecords,buildLaurusRecords} from './menu.mjs?v=20261111c';
+import {CAMPUS_NAMES,todayParts,shiftDateParts,helsinkiMinutes,formatLunchHours,shouldDisplayRestaurant,emptyMenuState,officialRestaurantUrl,buildRecords,buildAaltoRecords,buildLaurusRecords} from './menu.mjs?v=20261111d';
 import {dishTranslation} from './translation.mjs?v=20261111b';
 const API='https://unicafe.fi/wp-json/swiss/v1/restaurants';
 const content=document.querySelector('#content'), status=document.querySelector('#status'), dateNode=document.querySelector('#today'), refreshButton=document.querySelector('#refresh');
@@ -141,7 +141,7 @@ async function load(){
   currentDate=today.iso;sourceWarning='';sourceIncomplete=false;
   document.querySelector('#heading-day').textContent=day;
   document.title=`吃好饭 | ${day}哪里有肉和鱼？`;
-  document.querySelector('#list-note').textContent=offset===0?'已隐藏午餐结束或未找到相关菜品的食堂':'仅显示已公布且有相关菜品的食堂';
+  document.querySelector('#list-note').textContent=offset===0?'已隐藏时段结束或未找到相关菜品的食堂':'仅显示已公布且有相关菜品的食堂';
   dateNode.textContent=new Intl.DateTimeFormat('zh-CN',{timeZone:'Europe/Helsinki',month:'long',day:'numeric',weekday:'long'}).format(new Date(`${selected.iso}T12:00:00Z`));
   setStatus(school==='aalto'?'正在读取已发布菜单…':'正在获取官方菜单…');refreshButton.disabled=true;
   content.innerHTML=`<div class="state"><div class="spinner"></div><h3>正在查看${day}的菜单</h3><p>正在获取菜单信息…</p></div>`;

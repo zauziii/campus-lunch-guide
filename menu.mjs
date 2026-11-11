@@ -134,38 +134,46 @@ function matchesWeekday(label,weekday){
   if(start===undefined||end===undefined)return false;
   return start<=end?weekday>=start&&weekday<=end:weekday>=start||weekday<=end;
 }
-function describeLunch(item,exception){
+function describeHours(item,exception,kind){
   const raw=String(item.hours||'').trim();
-  if(item.closedException===true||/^(suljettu|closed)$/i.test(raw))return {status:'closed',label:exception?'午餐暂停 · 特殊时间':'午餐暂停 · 常规'};
+  if(item.closedException===true||/^(suljettu|closed)$/i.test(raw))return {status:'closed',label:`${kind==='午餐'?'午餐暂停':'暂停营业'} · ${exception?'特殊时间':'常规'}`};
   const match=raw.match(/^(\d{1,2})[:.](\d{2})\s*[-–—]\s*(\d{1,2})[:.](\d{2})$/);
   if(!match)return null;
   const [,a,b,c,d]=match.map(Number);
   if(a>23||c>23||b>59||d>59||a*60+b>=c*60+d)return null;
   const time=`${String(a).padStart(2,'0')}:${String(b).padStart(2,'0')}–${String(c).padStart(2,'0')}:${String(d).padStart(2,'0')}`;
-  return {status:exception?'exception':'regular',label:`午餐 ${time} · ${exception?'特殊时间':'常规'}`,startMinutes:a*60+b,endMinutes:c*60+d};
+  return {status:exception?'exception':'regular',label:`${kind} ${time} · ${exception?'特殊时间':'常规'}`,startMinutes:a*60+b,endMinutes:c*60+d};
 }
 export function resolveTodayLunchHours(visitingHours,iso){
-  const unknown={status:'unknown',label:'午餐时间未提供'};
-  const items=visitingHours?.lounas?.items;
+  // Some restaurants, including Olivia staff restaurant, publish only general
+  // opening hours. Keep the distinction in the label instead of calling them
+  // lunch hours, and prefer a published lunch schedule whenever one exists.
+  const lunch=visitingHours?.lounas;
+  const noLunch=lunch==null||lunch===false||(Array.isArray(lunch.items)&&lunch.items.length===0);
+  const businessItems=visitingHours?.business?.items;
+  const useBusiness=noLunch&&Array.isArray(businessItems)&&businessItems.length>0;
+  const kind=useBusiness?'营业':'午餐';
+  const unknown={status:'unknown',label:`${kind}时间未提供`};
+  const items=useBusiness?businessItems:lunch?.items;
   const date=new Date(`${iso}T12:00:00Z`);
   if(!Array.isArray(items)||!/^\d{4}-\d{2}-\d{2}$/.test(String(iso))||Number.isNaN(date.getTime())||date.toISOString().slice(0,10)!==iso)return unknown;
   const exceptions=items.filter(item=>item.exception===true);
   const matched=[];
   for(const item of exceptions){
     const match=matchesException(item.label,iso);
-    if(match===null)return {status:'unknown',label:'午餐时间请查看官网'};
+    if(match===null)return {status:'unknown',label:`${kind}时间请查看官网`};
     if(match)matched.push(item);
   }
   const weekday=(date.getUTCDay()+6)%7;
   const relevant=matched.length?matched:items.filter(item=>item.exception!==true&&matchesWeekday(item.label,weekday));
   if(!relevant.length)return unknown;
-  const descriptions=relevant.map(item=>describeLunch(item,matched.length>0));
-  if(descriptions.some(x=>!x))return {status:'unknown',label:'午餐时间请查看官网'};
-  if(descriptions.some(x=>x.label!==descriptions[0].label))return {status:'unknown',label:'午餐时间请查看官网'};
+  const descriptions=relevant.map(item=>describeHours(item,matched.length>0,kind));
+  if(descriptions.some(x=>!x))return {status:'unknown',label:`${kind}时间请查看官网`};
+  if(descriptions.some(x=>x.label!==descriptions[0].label))return {status:'unknown',label:`${kind}时间请查看官网`};
   return descriptions[0];
 }
 
-// Status is based on the published lunch schedule, not stock or actual opening.
+// Status follows the published lunch or opening schedule, not actual stock.
 export function formatLunchHours(hours,minutes){
   if(!hours)return '午餐时间未提供';
   if(!['regular','exception'].includes(hours.status)||!Number.isInteger(hours.startMinutes)||!Number.isInteger(hours.endMinutes)||!Number.isInteger(minutes)||minutes<0||minutes>=1440)return hours.label;

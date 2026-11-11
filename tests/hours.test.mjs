@@ -10,9 +10,31 @@ test('shows weekday lunch hours as regular hours',()=>{
   assert.deepEqual(resolveTodayLunchHours(schedule([regular,weekend]),'2026-11-06'),{status:'regular',label:'午餐 10:30–14:30 · 常规',startMinutes:630,endMinutes:870});
   assert.deepEqual(resolveTodayLunchHours(schedule([regular,weekend]),'2026-11-07'),{status:'closed',label:'午餐暂停 · 常规'});
 });
-test('does not infer closure from a missing day or use general opening hours',()=>{
+test('does not infer closure from a missing weekday',()=>{
   assert.equal(resolveTodayLunchHours(schedule([regular]),'2026-11-07').status,'unknown');
-  assert.equal(resolveTodayLunchHours({business:{items:[regular]},lounas:false},'2026-11-06').status,'unknown');
+});
+test('uses official opening hours when lunch hours are not supplied',()=>{
+  // Shape and values from the UniCafe English feed for Olivia staff restaurant.
+  const data={business:{name:null,items:[{label:'Mon–Fri',hours:'11:00-13:30',closedException:false}]},breakfast:false,bistro:false,lounas:false};
+  const hours=resolveTodayLunchHours(data,'2026-11-12');
+  assert.deepEqual(hours,{status:'regular',label:'营业 11:00–13:30 · 常规',startMinutes:660,endMinutes:810});
+  assert.equal(formatLunchHours(hours,659),'营业 11:00–13:30 · 常规 · 未开始');
+  assert.equal(formatLunchHours(hours,660),'营业 11:00–13:30 · 常规 · 时段内');
+  assert.equal(formatLunchHours(hours,810),'营业 11:00–13:30 · 常规 · 已结束');
+  assert.equal(resolveTodayLunchHours(data,'2026-11-14').status,'unknown');
+});
+test('prefers lunch hours and does not replace an unknown lunch day with opening hours',()=>{
+  const data={business:{items:[{label:'Mon–Sun',hours:'07:00-18:00'}]},lounas:{items:[regular]}};
+  assert.equal(resolveTodayLunchHours(data,'2026-11-06').label,'午餐 10:30–14:30 · 常规');
+  assert.equal(resolveTodayLunchHours(data,'2026-11-07').status,'unknown');
+});
+test('honours opening-hour exceptions and does not guess unrecognised ones',()=>{
+  const business={items:[{label:'Mon–Fri',hours:'11:00-13:30'},{exception:true,label:'12.11.',hours:'12:00-14:00'}]};
+  assert.deepEqual(resolveTodayLunchHours({lounas:false,business},'2026-11-12'),{status:'exception',label:'营业 12:00–14:00 · 特殊时间',startMinutes:720,endMinutes:840});
+  business.items[1].hours='Closed';
+  assert.deepEqual(resolveTodayLunchHours({lounas:false,business},'2026-11-12'),{status:'closed',label:'暂停营业 · 特殊时间'});
+  business.items[1].label='pyhäpäivä';
+  assert.deepEqual(resolveTodayLunchHours({lounas:false,business},'2026-11-12'),{status:'unknown',label:'营业时间请查看官网'});
 });
 test('uses the dated exception only on its date',()=>{
   const data=schedule([regular,{exception:true,label:'28.10',hours:'11:00–14:00'}]);

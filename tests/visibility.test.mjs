@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {resolveTodayLunchHours,shouldDisplayRestaurant} from '../menu.mjs';
+import {buildRecords,resolveTodayLunchHours,shouldDisplayRestaurant} from '../menu.mjs';
 
 const lunch={status:'regular',startMinutes:630,endMinutes:870};
 const meat={meat:{status:'identified'},fish:false};
@@ -33,4 +33,15 @@ test('uses a dated special schedule before the weekly schedule',()=>{
   ]}},'2026-11-06');
   assert.equal(shouldDisplayRestaurant(restaurant(hours,[meat]),15*60),true);
   assert.equal(shouldDisplayRestaurant(restaurant(hours,[meat]),16*60),false);
+});
+test('filters Olivia staff restaurant at its published closing time',()=>{
+  const data=[{slug:'olivia-henkilostoravintola',title:'Olivia staff restaurant',location:[{name:'City Centre'}],menuData:{
+    visitingHours:{business:{items:[{label:'Mon–Fri',hours:'11:00-13:30',closedException:false}]},lounas:false},
+    menus:[{date:'Thu 12.11.',data:[{name:'Chicken with Satay sauce',ingredients:'chicken fillet',meta:{}}]}]
+  }}];
+  const [record]=buildRecords(data,'12.11.','2026-11-12');
+  assert.equal(record.lunchHours.label,'营业 11:00–13:30 · 常规');
+  assert.equal(shouldDisplayRestaurant(record,809),true);
+  assert.equal(shouldDisplayRestaurant(record,810),false);
+  assert.equal(shouldDisplayRestaurant(record,null),true);
 });
