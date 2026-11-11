@@ -7,8 +7,8 @@
   <meta name="description" content="查看赫尔辛基大学和阿尔托大学附近食堂的肉类与鱼类菜单。">
   <title>吃好饭 | 今天哪里有肉和鱼？</title>
   <link rel="icon" href="favicon.svg?v=20261108a" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=20261108c">
-  <script src="app.js?v=20261109b" type="module"></script>
+  <link rel="stylesheet" href="styles.css?v=20261111a">
+  <script src="app.js?v=20261111a" type="module"></script>
 </head>
 <body>
   <header class="header"><div class="header-inner">
@@ -21,7 +21,7 @@
       <button class="university-option" type="button" data-university="aalto" aria-pressed="false">阿尔托大学</button>
     </nav>
     <section class="intro">
-      <div><p class="eyebrow" id="eyebrow">HELSINKI · UNICAFE</p><h1><b id="heading-day">今天</b>哪里有肉和鱼<span>？</span></h1><p class="intro-text">根据菜单查找肉类和鱼类。</p></div>
+      <div><p class="eyebrow" id="eyebrow">HELSINKI · CAMPUS</p><h1><b id="heading-day">今天</b>哪里有肉和鱼<span>？</span></h1><p class="intro-text">根据菜单查找肉类和鱼类。</p></div>
       <div class="date-panel"><div class="date-switch" role="group" aria-label="选择菜单日期"><button class="date-option" type="button" data-day="0" aria-pressed="true">今天</button><button class="date-option" type="button" data-day="1" aria-pressed="false">明天</button></div><strong id="today">正在获取日期…</strong><small>赫尔辛基时间</small></div>
     </section>
     <section class="menu-section" aria-label="各校区菜单">
@@ -29,11 +29,11 @@
         <div class="live-status" id="status" aria-live="polite"><span class="status-dot"></span> 正在获取官方菜单…</div>
         <div class="controls"><button id="refresh" class="text-button" type="button"><span aria-hidden="true">↻</span> 刷新</button></div>
       </div>
-      <div class="table-key"><span id="list-note">已隐藏午餐结束或未找到相关菜品的食堂</span><span class="legend"><span class="legend-item"><i class="dot meat" aria-hidden="true"></i><span>肉类：识别到</span></span><span class="legend-item"><i class="dot fish" aria-hidden="true"></i><span id="fish-legend">鱼 / 海鲜：官方标记</span></span></span></div>
+      <div class="table-key"><span id="list-note">已隐藏午餐结束或未找到相关菜品的食堂</span><span class="legend"><span class="legend-item"><i class="dot meat" aria-hidden="true"></i><span>肉类：识别到</span></span><span class="legend-item"><i class="dot fish" aria-hidden="true"></i><span id="fish-legend">鱼 / 海鲜：识别到</span></span></span></div>
       <div id="content" aria-live="polite"><div class="state"><div class="spinner"></div><h3>正在查看今天的菜单</h3><p>从 UniCafe 获取最新信息…</p></div></div>
-      <div class="notice"><span class="notice-icon">i</span><div class="notice-body"><p id="notice-copy">菜单与翻译可能有误；待确认不代表没有肉，过敏信息请核对官网。</p><details class="notice-help"><summary>查看识别与更新说明</summary><p id="notice-details">肉类根据官方菜名和配料识别，可能遗漏或误判；配料有时属于酱汁或不同选项。鱼 / 海鲜依据官方过敏原标记。同一餐厅可能同时计入肉类和鱼类。午餐状态不代表实际供应或库存，详情请查看 UniCafe 官网。</p></details></div></div>
+      <div class="notice"><span class="notice-icon">i</span><div class="notice-body"><p id="notice-copy">菜单与翻译可能有误；待确认不代表没有肉，过敏信息请核对官网。</p><details class="notice-help"><summary>查看识别与更新说明</summary><p id="notice-details">肉类和鱼类依据菜名、配料或官方过敏原识别，可能遗漏或误判；同一餐厅可能同时计入肉类和鱼类。UniCafe 菜单实时获取；主楼菜单每日采集，刷新只会重新读取已发布的数据。详情请查看餐厅官网。</p></details></div></div>
     </section>
   </main>
-  <footer><span><strong>吃好饭<span>。</span></strong> <i>·</i> 认真吃饭，好好生活。</span><span id="footer-source">非官方独立项目 · 数据来源 UniCafe</span></footer>
+  <footer><span><strong>吃好饭<span>。</span></strong> <i>·</i> 认真吃饭，好好生活。</span><span id="footer-source">非官方独立项目 · 数据来源 UniCafe / Sodexo</span></footer>
 </body>
 </html>

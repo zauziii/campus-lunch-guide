@@ -1,4 +1,4 @@
-import {CAMPUS_NAMES,todayParts,shiftDateParts,helsinkiMinutes,formatLunchHours,shouldDisplayRestaurant,emptyMenuState,officialRestaurantUrl,buildRecords,buildAaltoRecords} from './menu.mjs?v=20261108c';
+import {CAMPUS_NAMES,todayParts,shiftDateParts,helsinkiMinutes,formatLunchHours,shouldDisplayRestaurant,emptyMenuState,officialRestaurantUrl,buildRecords,buildAaltoRecords,buildLaurusRecords} from './menu.mjs?v=20261111a';
 import {dishTranslation} from './translation.mjs?v=20261109b';
 const API='https://unicafe.fi/wp-json/swiss/v1/restaurants';
 const content=document.querySelector('#content'), status=document.querySelector('#status'), dateNode=document.querySelector('#today'), refreshButton=document.querySelector('#refresh');
@@ -35,16 +35,17 @@ function selectedMenuState(){
   return state;
 }
 function signature(list){return JSON.stringify([list.map(r=>r.slug),selectedMenuState()?.kind]);}
-function renderDish(dish, kind){
+function renderDish(dish, kind, restaurant){
   const translated=translationFor(dish);
+  const external=restaurant.provider==='external';
   const item=el('li','dish'),title=el('span','dish-name',translated||dish.original);item.append(title);
   if(kind==='meat' && dish.meat.status==='identified'){
-    const evidence=university==='aalto'?`${dish.meat.source==='食材信息'?'食材信息':'菜名识别'} · ${dish.meat.animal}`:dish.meat.source==='菜名'?dish.meat.animal:`配料含肉（${dish.meat.animal}）`;
+    const evidence=external?`${dish.meat.source==='食材信息'?'食材信息':'菜名识别'} · ${dish.meat.animal}`:dish.meat.source==='菜名'?dish.meat.animal:`配料含肉（${dish.meat.animal}）`;
     item.append(el('span','evidence',evidence));
   }
   if(kind==='fish'){
     const labels=[];if(dish.marks.containsFish)labels.push('鱼');if(dish.marks.containsCrustaceans)labels.push('甲壳类');if(dish.marks.containsMolluscs)labels.push('贝类');
-    const basis=university==='aalto'?(dish.fishEvidence==='菜名'?'菜名识别':dish.fishEvidence==='食材信息'?'食材信息':'官方过敏原'):'官方标记';
+    const basis=external?(dish.fishEvidence==='菜名'?'菜名识别':dish.fishEvidence==='食材信息'?'食材信息':'官方过敏原'):'官方标记';
     item.append(el('span','evidence',`${basis}：${labels.join(' / ')}`));
   }
   const original=el('span','original'),note=el('span','untranslated');item.append(original,note);
@@ -84,13 +85,13 @@ function render(){
     const arrow=el('span','campus-arrow','⌄');arrow.setAttribute('aria-hidden','true');meta.append(arrow);
     header.append(meta);section.append(header);
     const table=el('table','menu-table');const thead=el('thead');const heading=el('tr');
-    for(const label of ['食堂','肉类（已识别）',university==='aalto'?'鱼 / 海鲜（已识别）':'鱼 / 海鲜（官方标记）']){const th=el('th','',label);th.scope='col';heading.append(th);}
+    for(const label of ['食堂','肉类（已识别）','鱼 / 海鲜']){const th=el('th','',label);th.scope='col';heading.append(th);}
     thead.append(heading);table.append(thead);const tbody=el('tbody');
     for(const restaurant of list){
       const row=el('tr');const name=el('th','restaurant-name');name.scope='row';
-      const officialUrl=university==='aalto'?restaurant.officialUrl:officialRestaurantUrl(restaurant.slug);
+      const officialUrl=restaurant.provider==='external'?restaurant.officialUrl:officialRestaurantUrl(restaurant.slug);
       const restaurantName=el(officialUrl?'a':'span','name-text restaurant-link',restaurant.name);
-      if(officialUrl){restaurantName.href=officialUrl;restaurantName.target='_blank';restaurantName.rel='noopener noreferrer';restaurantName.setAttribute('aria-label',`${restaurant.name}，在${university==='aalto'?'餐厅':'UniCafe'}官网打开`);restaurantName.append(el('span','restaurant-link-icon',' ↗'));}
+      if(officialUrl){restaurantName.href=officialUrl;restaurantName.target='_blank';restaurantName.rel='noopener noreferrer';restaurantName.setAttribute('aria-label',`${restaurant.name}，在${restaurant.provider==='external'?'餐厅':'UniCafe'}官网打开`);restaurantName.append(el('span','restaurant-link-icon',' ↗'));}
       name.append(restaurantName);
       const information=el('details','restaurant-info');information.open=expandedRestaurants.has(restaurant.slug);
       information.addEventListener('toggle',()=>{if(!information.isConnected)return;if(information.open)expandedRestaurants.add(restaurant.slug);else expandedRestaurants.delete(restaurant.slug);});
@@ -106,17 +107,17 @@ function render(){
         const identified=restaurant.dishes.filter(d=>d.meat.status==='identified');
         const pending=restaurant.dishes.filter(d=>d.meat.status==='uncertain');
         if(!identified.length)meatCell.append(el('span','none','未识别到肉'));
-        else{const items=el('ul','dish-list');identified.forEach(d=>items.append(renderDish(d,'meat')));meatCell.append(items);}
+        else{const items=el('ul','dish-list');identified.forEach(d=>items.append(renderDish(d,'meat',restaurant)));meatCell.append(items);}
         if(pending.length){
           const panel=el('details','pending-dishes');panel.open=expandedPending.has(restaurant.slug);
           panel.addEventListener('toggle',()=>{if(!panel.isConnected)return;if(panel.open)expandedPending.add(restaurant.slug);else expandedPending.delete(restaurant.slug);});
           panel.append(el('summary','pending-toggle',`${pending.length} 道待确认`));
-          const items=el('ul','dish-list');pending.forEach(d=>items.append(renderDish(d,'pending')));panel.append(items);meatCell.append(panel);
+          const items=el('ul','dish-list');pending.forEach(d=>items.append(renderDish(d,'pending',restaurant)));panel.append(items);meatCell.append(panel);
         }
         row.append(meatCell);
         const fishCell=el('td','dish-cell fish');const fishDishes=restaurant.dishes.filter(d=>d.fish);
         if(!fishDishes.length)fishCell.append(el('span','none','未识别到鱼 / 海鲜'));
-        else{const items=el('ul','dish-list');fishDishes.forEach(d=>items.append(renderDish(d,'fish')));fishCell.append(items);}
+        else{const items=el('ul','dish-list');fishDishes.forEach(d=>items.append(renderDish(d,'fish',restaurant)));fishCell.append(items);}
         row.append(fishCell);
       }
       tbody.append(row);
@@ -145,18 +146,29 @@ async function load(){
   content.innerHTML=`<div class="state"><div class="spinner"></div><h3>正在查看${day}的菜单</h3><p>正在获取菜单信息…</p></div>`;
   try{
     const [response,prepared]=await Promise.all([
-      school==='helsinki'?fetch(`${API}?lang=en`,{cache:'no-store',signal:AbortSignal.timeout(25000)}):Promise.resolve(null),
+      school==='helsinki'?fetch(`${API}?lang=en`,{cache:'no-store',signal:AbortSignal.timeout(25000)}).catch(()=>null):Promise.resolve(null),
       loadPrepared()
     ]);
     if(version!==run)return;
     translations=prepared?.translations&&typeof prepared.translations==='object'&&!Array.isArray(prepared.translations)?prepared.translations:{};
     if(school==='helsinki'){
-      if(!response?.ok)throw Error('menu');
-      const en=await response.json();if(!Array.isArray(en))throw Error('menu');
+      let en=null;
+      try{if(response?.ok){const data=await response.json();if(Array.isArray(data))en=data;}}catch{}
       if(version!==run)return;
-      records=buildRecords(en,selected.token,selected.iso);
+      records=en?buildRecords(en,selected.token,selected.iso):[];
+      const city=records.find(r=>r.campus==='City Centre'||r.campus==='Keskusta')?.campus||'City Centre';
+      const snapshot=prepared?.laurus,laurus=buildLaurusRecords(snapshot,selected.iso,city);
+      if(!en&&!laurus.length)throw Error('menu');
+      records.push(...laurus);
+      const warnings=[];
+      if(!en){warnings.push('UniCafe 菜单暂时无法获取');sourceIncomplete=true;}
+      if(!snapshot?.collectedAt||!laurus.length){warnings.push('主楼餐厅菜单暂时无法获取');sourceIncomplete=true;}
+      else if(snapshot.refreshFailed){warnings.push('主楼餐厅显示上次采集的数据');sourceIncomplete=true;}
+      else if(snapshot.officialAvailable===false){warnings.push('主楼餐厅暂用 Kanttiinit 数据');sourceIncomplete=true;}
+      else if(!laurus[0].hasMenu){warnings.push(`主楼餐厅${day}暂无菜单`);sourceIncomplete=true;}
+      sourceWarning=warnings.length?`${warnings.join('；')}。`:'';
       const time=new Intl.DateTimeFormat('zh-CN',{timeZone:'Europe/Helsinki',hour:'2-digit',minute:'2-digit'}).format(new Date());
-      setStatus(`菜单获取 ${time}`,true);
+      setStatus(en?`UniCafe 获取 ${time}`:'主楼菜单已读取',Boolean(en));
     }else{
       const snapshot=prepared?.aalto;
       if(!snapshot?.collectedAt||!Array.isArray(snapshot.restaurants)||!snapshot.restaurants.length)throw Error('aalto');
@@ -180,15 +192,15 @@ function selectUniversity(next){
   for(const button of document.querySelectorAll('[data-university]'))button.setAttribute('aria-pressed',String(button.dataset.university===next));
   const link=document.querySelector('#source-link');link.href=next==='aalto'?'https://kanttiinit.fi/':'https://unicafe.fi/';
   link.replaceChildren(document.createTextNode(next==='aalto'?'Kanttiinit 菜单 ':'UniCafe 官网 '),el('span','','↗'));
-  document.querySelector('#eyebrow').textContent=next==='aalto'?'AALTO · OTANIEMI':'HELSINKI · UNICAFE';
-  document.querySelector('#fish-legend').textContent=next==='aalto'?'鱼 / 海鲜：识别到':'鱼 / 海鲜：官方标记';
-  document.querySelector('#footer-source').textContent=next==='aalto'?'非官方独立项目 · 数据来源 Kanttiinit 与餐厅官网':'非官方独立项目 · 数据来源 UniCafe';
+  document.querySelector('#eyebrow').textContent=next==='aalto'?'AALTO · OTANIEMI':'HELSINKI · CAMPUS';
+  document.querySelector('#fish-legend').textContent='鱼 / 海鲜：识别到';
+  document.querySelector('#footer-source').textContent=next==='aalto'?'非官方独立项目 · 数据来源 Kanttiinit 与餐厅官网':'非官方独立项目 · 数据来源 UniCafe / Sodexo';
   document.querySelector('#notice-details').textContent=next==='aalto'
     ?'部分餐厅提供食材或过敏原信息，其余依据菜名识别；配料可能属于酱汁或不同选项，同一餐厅可能同时计入肉类和鱼类。Aalto 菜单通常每日定时采集，“重新加载”只读取已发布的数据。营业和供应信息请核对餐厅官网。'
-    :'肉类根据官方菜名和配料识别，可能遗漏或误判；配料有时属于酱汁或不同选项。鱼 / 海鲜依据官方过敏原标记。同一餐厅可能同时计入肉类和鱼类。午餐状态不代表实际供应或库存，详情请查看 UniCafe 官网。';
+    :'肉类和鱼类依据菜名、配料或官方过敏原识别，可能遗漏或误判；同一餐厅可能同时计入肉类和鱼类。UniCafe 菜单实时获取；主楼菜单每日采集，刷新只会重新读取已发布的数据。详情请查看餐厅官网。';
   const refreshIcon=el('span','','↻');refreshIcon.setAttribute('aria-hidden','true');
   refreshButton.replaceChildren(refreshIcon,document.createTextNode(next==='aalto'?' 重新加载':' 刷新'));
-  refreshButton.title=next==='aalto'?'重新读取已发布的菜单，不会立即重新采集餐厅数据':'重新获取 UniCafe 菜单';
+  refreshButton.title=next==='aalto'?'重新读取已发布的菜单，不会立即重新采集餐厅数据':'重新获取 UniCafe 菜单，并读取已发布的主楼菜单';
   load();
 }
 function selectDay(next){

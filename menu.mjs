@@ -67,7 +67,7 @@ function searchableMeatText(text) {
     .replace(/\b(?:chicken|beef|pork|turkey|poultry)\s+(?:fat|stock|broth|bouillon|flavou?r(?:ing)?)(?:\s+powder)?\b/giu,' ');
 }
 const MEAT_WORDS=[
-  ['鸡肉',/(?:broiler[\p{L}-]*|kana[\p{L}-]*|\bchicken\b)/iu],
+  ['鸡肉',/(?:broiler[\p{L}-]*|kana[\p{L}-]*|\b(?:chicken|pollo)\b)/iu],
   ['猪肉',/(?:pors[\p{L}-]*|possu[\p{L}-]*|sianliha[\p{L}-]*|kinkku[\p{L}-]*|pekoni[\p{L}-]*|\bpork\b|\bbacon\b|\bham\b)/iu],
   ['牛肉',/(?:naudan\s*(?:liha|filee|paisti|pihvi|jauhe|suikale)[\p{L}-]*|nauta(?:liha|filee|paisti|pihvi|jauhe|suikale)[\p{L}-]*|häränliha[\p{L}-]*|\b(?:beef|veal)\b)/iu],
   ['火鸡肉',/(?:kalkkun[\p{L}-]*|\bturkey\b)/iu],
@@ -223,7 +223,7 @@ export function buildRecords(restaurants, token, iso=todayParts().iso) {
   });
 }
 
-const FISH_NAME=/(?:\b(?:fish|salmon|trout|cod|saithe|pollock|herring|tuna|perch|pike|vendace|anchov(?:y|ies)|whitefish|plaice)\b|(?:^|[^\p{L}])[\p{L}-]*(?:kala|lohi|seiti|seit[äa]|muikku|ahven|turska|tonnikala|silakka|silli|kuha)[\p{L}-]*)/iu;
+const FISH_NAME=/(?:\b(?:fish|salmon|trout|cod|saithe|coley|pollock|herring|tuna|perch|pike|vendace|anchov(?:y|ies)|whitefish|plaice)\b|(?:^|[^\p{L}])[\p{L}-]*(?:kala|lohi|seiti|seit[äa]|muikku|ahven|turska|tonnikala|silakka|silli|kuha)[\p{L}-]*)/iu;
 const CRUSTACEAN_NAME=/(?:\b(?:shrimp|prawns?|crab|lobster|crustaceans?)\b|(?:^|[^\p{L}])[\p{L}-]*(?:katkarapu|äyriäi)[\p{L}-]*)/iu;
 const MOLLUSC_NAME=/(?:\b(?:molluscs?|mussels?|oysters?|squid|octopus|scallops?)\b|(?:^|[^\p{L}])[\p{L}-]*(?:simpukka|mustekala|nilviäi)[\p{L}-]*)/iu;
 function declaredFoodText(value){
@@ -279,13 +279,21 @@ function aaltoHours(day,weekly,iso){
   return {status:'unknown',label:'时间请查看官网'};
 }
 
-export function buildAaltoRecords(snapshot,iso=todayParts().iso){
+function buildExternalRecords(snapshot,iso,campus,prefix,onlyId=null){
   if(!snapshot||!Array.isArray(snapshot.restaurants))return [];
-  return snapshot.restaurants.filter(r=>r&&Number.isSafeInteger(r.id)).map(r=>{
+  return snapshot.restaurants.filter(r=>r&&Number.isSafeInteger(r.id)&&(onlyId===null||r.id===onlyId)).map(r=>{
     const day=r.menus&&typeof r.menus==='object'?r.menus[iso]:null;
     const dishes=(Array.isArray(day?.dishes)?day.dishes:[]).filter(d=>typeof d?.name==='string'&&d.name.trim()).map(classifyAaltoDish);
     let url='';try{const parsed=new URL(String(r.url||''));if(parsed.protocol==='https:')url=parsed.href;}catch{}
-    return {slug:`aalto-${r.id}`,name:String(r.name||''),campus:'Otaniemi',address:String(r.address||''),staff:false,
-      officialUrl:url,sourceAvailable:r.sourceAvailable!==false,hasMenu:!!day,lunchHours:aaltoHours(day,r.weeklyHours,iso),dishes};
+    return {slug:`${prefix}-${r.id}`,name:String(r.name||''),campus,address:String(r.address||''),staff:false,
+      provider:'external',officialUrl:url,sourceAvailable:r.sourceAvailable!==false,hasMenu:!!day,lunchHours:aaltoHours(day,r.weeklyHours,iso),dishes};
   });
+}
+
+export function buildAaltoRecords(snapshot,iso=todayParts().iso){
+  return buildExternalRecords(snapshot,iso,'Otaniemi','aalto');
+}
+
+export function buildLaurusRecords(snapshot,iso=todayParts().iso,cityCampus='City Centre'){
+  return buildExternalRecords(snapshot,iso,cityCampus,'laurus',69);
 }

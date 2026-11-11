@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Collect public Otaniemi menus for the scheduled GitHub Pages build.
+"""Collect public Otaniemi or Helsinki Main Building menus for the Pages build.
 
 The aggregator supplies restaurant metadata and a fallback menu. Compass and
 Sodexo official sources replace the corresponding fallback when available.
@@ -17,6 +17,8 @@ import sys
 
 KITCHEN = 'https://kitchen.kanttiinit.fi'
 USER_AGENT = 'CampusLunchGuide/1.0 (public student menu aggregation)'
+LAURUS_ID = 69
+LAURUS_URL = 'https://www.sodexo.fi/en/restaurants/helsinki-university-main-building'
 
 # These links were checked against the restaurant websites and Aalto's campus
 # directory. New Otaniemi entries use the HTTPS link from Kanttiinit metadata.
@@ -294,9 +296,55 @@ def collect(today=None, json_fetch=load_json, html_fetch=download):
             'partial': menu_error or len(records) != len(ids)}
 
 
+def collect_laurus(today=None, json_fetch=load_json, html_fetch=download):
+    """Collect the Main Building's Laurus and Civis menu independently of Aalto."""
+    today = today or datetime.now(ZoneInfo('Europe/Helsinki')).date()
+    days = [(today + timedelta(days=i)).isoformat() for i in range(8)]
+    metadata = {}
+    try:
+        items = json_fetch(f'{KITCHEN}/restaurants?' + urlencode({'lang': 'en', 'ids': str(LAURUS_ID)}))
+        if isinstance(items, list):
+            metadata = next((item for item in items if isinstance(item, dict) and item.get('id') == LAURUS_ID), {})
+    except Exception:
+        pass
+
+    fallback, fallback_ok = {}, False
+    try:
+        menus = json_fetch(f'{KITCHEN}/menus?' + urlencode({'lang': 'en', 'restaurants': str(LAURUS_ID), 'days': ','.join(days)}))
+        if not isinstance(menus, dict):
+            raise ValueError('Unexpected Kanttiinit menu data')
+        stored = menus.get(str(LAURUS_ID), {})
+        if not isinstance(stored, dict):
+            raise ValueError('Unexpected Main Building menu data')
+        fallback = {day: {'dishes': parse_kanttiinit(courses), 'lunchHours': None, 'source': 'kanttiinit'}
+                    for day, courses in stored.items() if day in days}
+        fallback_ok = True
+    except Exception:
+        pass
+
+    official, official_ok = {}, False
+    try:
+        official = parse_sodexo(html_fetch(LAURUS_URL), today)
+        official_ok = True
+    except Exception:
+        pass
+    if not official_ok and not fallback_ok:
+        raise ValueError('Neither Main Building menu source was available')
+
+    for day, value in official.items():
+        if day in days and (value.get('dishes') or not fallback.get(day, {}).get('dishes')):
+            fallback[day] = value
+    hours = metadata.get('openingHours') if isinstance(metadata.get('openingHours'), list) else []
+    record = {'id': LAURUS_ID, 'name': 'Laurus / Café Civis', 'url': LAURUS_URL,
+              'address': 'Fabianinkatu 33, 00170 Helsinki', 'weeklyHours': hours,
+              'sourceAvailable': True, 'menus': fallback}
+    return {'version': 1, 'collectedAt': datetime.now(timezone.utc).isoformat(),
+            'officialAvailable': official_ok, 'restaurants': [record]}
+
+
 if __name__ == '__main__':
     try:
-        print(json.dumps(collect(), ensure_ascii=False))
+        print(json.dumps(collect_laurus() if sys.argv[1:] == ['--laurus'] else collect(), ensure_ascii=False))
     except Exception as error:
-        print(f'Aalto menu collection failed: {type(error).__name__}', file=sys.stderr)
+        print(f'Menu collection failed: {type(error).__name__}', file=sys.stderr)
         sys.exit(1)

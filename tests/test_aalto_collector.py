@@ -95,6 +95,52 @@ class CollectorTests(unittest.TestCase):
         self.assertIsNone(collector.day_from_label('Previous Week', date(2026, 11, 7)))
         self.assertEqual(collector.day_from_label('Fri 01.01', date(2026, 12, 31)), '2027-01-01')
 
+    def test_main_building_uses_sodexo_and_its_own_metadata(self):
+        def fetch_json(url):
+            if '/restaurants?' in url:
+                return [{'id': 69, 'openingHours': ['10:30 - 15:00'] * 5 + [None, None]}]
+            if '/menus?' in url:
+                return {'69': {'2026-11-09': [{'title': 'Older fallback dish', 'properties': []}],
+                               '2026-11-10': [{'title': 'Seitä', 'properties': []}]}}
+            raise AssertionError(url)
+        result = collector.collect_laurus(today=date(2026, 11, 9), json_fetch=fetch_json, html_fetch=lambda _: HTML)
+        restaurant = result['restaurants'][0]
+        self.assertTrue(result['officialAvailable'])
+        self.assertEqual(restaurant['id'], 69)
+        self.assertEqual(restaurant['name'], 'Laurus / Café Civis')
+        self.assertEqual(restaurant['url'], collector.LAURUS_URL)
+        self.assertEqual(restaurant['menus']['2026-11-09']['dishes'][0]['source'], 'sodexo')
+        self.assertEqual(restaurant['menus']['2026-11-10']['dishes'][0]['source'], 'kanttiinit')
+        self.assertEqual(restaurant['menus']['2026-11-09']['lunchHours']['end'], 18 * 60)
+
+    def test_main_building_uses_kanttiinit_when_sodexo_fails(self):
+        def fetch_json(url):
+            if '/restaurants?' in url:
+                return [{'id': 69, 'openingHours': ['10:30 - 15:00'] * 5 + [None, None]}]
+            if '/menus?' in url:
+                return {'69': {'2026-11-11': [{'title': 'Paistettua seitiä', 'properties': ['G']}]}}
+            raise AssertionError(url)
+        def fail_html(_):
+            raise OSError('official source unavailable')
+        result = collector.collect_laurus(today=date(2026, 11, 11), json_fetch=fetch_json, html_fetch=fail_html)
+        dish = result['restaurants'][0]['menus']['2026-11-11']['dishes'][0]
+        self.assertFalse(result['officialAvailable'])
+        self.assertEqual(dish['source'], 'kanttiinit')
+        self.assertEqual(dish['ingredients'], [])
+
+    def test_main_building_uses_official_source_without_kanttiinit(self):
+        def fail_json(_):
+            raise OSError('aggregator unavailable')
+        result = collector.collect_laurus(today=date(2026, 11, 9), json_fetch=fail_json, html_fetch=lambda _: HTML)
+        self.assertTrue(result['officialAvailable'])
+        self.assertEqual(result['restaurants'][0]['menus']['2026-11-09']['source'], 'sodexo')
+
+    def test_main_building_reports_when_both_sources_fail(self):
+        def fail(_):
+            raise OSError('unavailable')
+        with self.assertRaisesRegex(ValueError, 'Neither Main Building menu source'):
+            collector.collect_laurus(today=date(2026, 11, 11), json_fetch=fail, html_fetch=fail)
+
 
 if __name__ == '__main__':
     unittest.main()
