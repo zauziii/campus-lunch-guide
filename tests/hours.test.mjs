@@ -23,10 +23,14 @@ test('uses official opening hours when lunch hours are not supplied',()=>{
   assert.equal(formatLunchHours(hours,810),'营业 11:00–13:30 · 常规 · 已结束');
   assert.equal(resolveTodayLunchHours(data,'2026-11-14').status,'unknown');
 });
-test('prefers lunch hours and does not replace an unknown lunch day with opening hours',()=>{
+test('prefers lunch hours and uses opening hours when no lunch hours are published for the day',()=>{
   const data={business:{items:[{label:'Mon–Sun',hours:'07:00-18:00'}]},lounas:{items:[regular]}};
   assert.equal(resolveTodayLunchHours(data,'2026-11-06').label,'午餐 10:30–14:30 · 常规');
-  assert.equal(resolveTodayLunchHours(data,'2026-11-07').status,'unknown');
+  assert.equal(resolveTodayLunchHours(data,'2026-11-07').label,'营业 07:00–18:00 · 常规');
+  data.lounas.items.push({label:'Sat',hours:'Closed'});
+  assert.deepEqual(resolveTodayLunchHours(data,'2026-11-07'),{status:'closed',label:'午餐暂停 · 常规'});
+  data.lounas.items.push({exception:true,label:'pyhäpäivä',hours:'Closed'});
+  assert.deepEqual(resolveTodayLunchHours(data,'2026-11-06'),{status:'unknown',label:'午餐时间请查看官网'});
 });
 test('honours opening-hour exceptions and does not guess unrecognised ones',()=>{
   const business={items:[{label:'Mon–Fri',hours:'11:00-13:30'},{exception:true,label:'12.11.',hours:'12:00-14:00'}]};

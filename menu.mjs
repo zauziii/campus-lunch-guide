@@ -144,19 +144,7 @@ function describeHours(item,exception,kind){
   const time=`${String(a).padStart(2,'0')}:${String(b).padStart(2,'0')}–${String(c).padStart(2,'0')}:${String(d).padStart(2,'0')}`;
   return {status:exception?'exception':'regular',label:`${kind} ${time} · ${exception?'特殊时间':'常规'}`,startMinutes:a*60+b,endMinutes:c*60+d};
 }
-export function resolveTodayLunchHours(visitingHours,iso){
-  // Some restaurants, including Olivia staff restaurant, publish only general
-  // opening hours. Keep the distinction in the label instead of calling them
-  // lunch hours, and prefer a published lunch schedule whenever one exists.
-  const lunch=visitingHours?.lounas;
-  const noLunch=lunch==null||lunch===false||(Array.isArray(lunch.items)&&lunch.items.length===0);
-  const businessItems=visitingHours?.business?.items;
-  const useBusiness=noLunch&&Array.isArray(businessItems)&&businessItems.length>0;
-  const kind=useBusiness?'营业':'午餐';
-  const unknown={status:'unknown',label:`${kind}时间未提供`};
-  const items=useBusiness?businessItems:lunch?.items;
-  const date=new Date(`${iso}T12:00:00Z`);
-  if(!Array.isArray(items)||!/^\d{4}-\d{2}-\d{2}$/.test(String(iso))||Number.isNaN(date.getTime())||date.toISOString().slice(0,10)!==iso)return unknown;
+function resolveHoursForDay(items,iso,date,kind){
   const exceptions=items.filter(item=>item.exception===true);
   const matched=[];
   for(const item of exceptions){
@@ -166,11 +154,31 @@ export function resolveTodayLunchHours(visitingHours,iso){
   }
   const weekday=(date.getUTCDay()+6)%7;
   const relevant=matched.length?matched:items.filter(item=>item.exception!==true&&matchesWeekday(item.label,weekday));
-  if(!relevant.length)return unknown;
+  if(!relevant.length)return null;
   const descriptions=relevant.map(item=>describeHours(item,matched.length>0,kind));
   if(descriptions.some(x=>!x))return {status:'unknown',label:`${kind}时间请查看官网`};
   if(descriptions.some(x=>x.label!==descriptions[0].label))return {status:'unknown',label:`${kind}时间请查看官网`};
   return descriptions[0];
+}
+export function resolveTodayLunchHours(visitingHours,iso){
+  const unknown={status:'unknown',label:'午餐时间未提供'};
+  const date=new Date(`${iso}T12:00:00Z`);
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(String(iso))||Number.isNaN(date.getTime())||date.toISOString().slice(0,10)!==iso)return unknown;
+
+  // Prefer lunch hours for the selected day. If none are published, show
+  // business hours as such; never replace an explicit closure or an
+  // unrecognised lunch exception with the general opening schedule.
+  const lunch=visitingHours?.lounas;
+  if(lunch!=null&&lunch!==false){
+    if(!Array.isArray(lunch.items))return unknown;
+    const result=resolveHoursForDay(lunch.items,iso,date,'午餐');
+    if(result)return result;
+  }
+  const business=visitingHours?.business?.items;
+  if(Array.isArray(business)&&business.length){
+    return resolveHoursForDay(business,iso,date,'营业')||{status:'unknown',label:'营业时间未提供'};
+  }
+  return unknown;
 }
 
 // Status follows the published lunch or opening schedule, not actual stock.
