@@ -45,3 +45,15 @@ test('filters Olivia staff restaurant at its published closing time',()=>{
   assert.equal(shouldDisplayRestaurant(record,810),false);
   assert.equal(shouldDisplayRestaurant(record,null),true);
 });
+test('does not mark identified fish or seafood as uncertain meat',()=>{
+  const menu=[
+    {name:'Mango-seesamikirjolohta',meta:{'1':['fish']},price:{name:'Erikoinen'}},
+    {name:'Seafood special',meta:{'1':['crustacean']},price:{name:'Lounas'}},
+    {name:'Mystery special',meta:{},price:{name:'Erikoinen'}},
+    {name:'Chicken with fish sauce',ingredients:'chicken, fish sauce',meta:{'1':['fish']},price:{name:'Lounas'}}
+  ];
+  const [record]=buildRecords([{slug:'meilahti',title:'Meilahti',location:[{name:'Meilahti'}],menuData:{menus:[{date:'Thu 12.11.',data:menu}]}}],'12.11.','2026-11-12');
+  assert.deepEqual(record.dishes.map(d=>[d.fish,d.meat.status]),[
+    [true,'excluded'],[true,'excluded'],[false,'uncertain'],[true,'identified']
+  ]);
+});

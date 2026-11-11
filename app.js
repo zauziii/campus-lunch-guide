@@ -1,4 +1,4 @@
-import {CAMPUS_NAMES,todayParts,shiftDateParts,helsinkiMinutes,formatLunchHours,shouldDisplayRestaurant,emptyMenuState,officialRestaurantUrl,buildRecords,buildAaltoRecords,buildLaurusRecords} from './menu.mjs?v=20261111e';
+import {CAMPUS_NAMES,todayParts,shiftDateParts,helsinkiMinutes,formatLunchHours,shouldDisplayRestaurant,emptyMenuState,officialRestaurantUrl,buildRecords,buildAaltoRecords,buildLaurusRecords} from './menu.mjs?v=20261111f';
 import {dishTranslation} from './translation.mjs?v=20261111b';
 const API='https://unicafe.fi/wp-json/swiss/v1/restaurants';
 const content=document.querySelector('#content'), status=document.querySelector('#status'), dateNode=document.querySelector('#today'), refreshButton=document.querySelector('#refresh');

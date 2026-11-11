@@ -90,6 +90,9 @@ export function detectMeat(dish) {
   const titleHit=explicitlyPlantBased?null:findMeat(title);
   if(titleHit)return {status:'identified',source:'菜名',...titleHit};
   if(ingredientHit)return {status:'identified',source:'配料',...ingredientHit};
+  // A known fish or seafood dish does not also need a meat-review label.
+  // Explicit meat evidence above remains valid for dishes containing both.
+  if(marks.containsFish||marks.containsCrustaceans||marks.containsMolluscs)return {status:'excluded',reason:'已识别为鱼或海鲜'};
   const orange=classifyDish(dish)==='orange';
   return {status:orange?'uncertain':'excluded',reason:orange?'没有明确肉类线索':'其他菜单类别'};
 }
