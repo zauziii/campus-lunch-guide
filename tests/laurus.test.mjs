@@ -47,13 +47,24 @@ test('recognizes coley and pollo in dish names without labelling vegan pollo as 
   assert.notEqual(classifyAaltoDish({name:'Vegan pollo pasta',properties:['VV']}).meat.status,'identified');
 });
 
+test('does not mistake Finnish nationality words for fish but recognizes actual fish compounds',()=>{
+  const cheese={name:'Cafe Civis: Greek cheese baguette',components:['Kreikkalainen juustopatonki G, L'],source:'sodexo'};
+  assert.equal(classifyAaltoDish(cheese).fish,false);
+  for(const name of ['Kreikkalainen salaatti','Amerikkalainen kastike','Ranskalaisia perunoita']){
+    assert.equal(classifyAaltoDish({name}).fish,false,name);
+  }
+  for(const name of ['Kalakeittoa','Mantelikalaa','Savukalaa','Tonnikalaa','Kreikkalainen kala']){
+    assert.equal(classifyAaltoDish({name}).fish,true,name);
+  }
+});
+
 test('includes relevant Main Building menu names in the translation cache',async()=>{
   let body=[];
   const cache=await buildCache({restaurants:[],previous:{},laurus:snapshot,key:'test-key',fetchImpl:async(_url,options)=>{
     body=JSON.parse(options.body);
     return {ok:true,json:async()=>body.map(()=>({translations:[{text:'测试菜名'}]}))};
   }});
-  assert.ok(body.some(x=>x.Text==='Pollo limonello pasta'));
+  assert.ok(!body.some(x=>x.Text==='Pollo limonello pasta'));
   assert.ok(body.some(x=>x.Text.includes('Fried coley')));
   assert.ok(!body.some(x=>x.Text==='Root vegetable and bean hash'));
   assert.equal(cache.translations['Cafe Civis: Curry chicken baguette'],'测试菜名');

@@ -223,7 +223,9 @@ export function buildRecords(restaurants, token, iso=todayParts().iso) {
   });
 }
 
-const FISH_NAME=/(?:\b(?:fish|salmon|trout|cod|saithe|coley|pollock|herring|tuna|perch|pike|vendace|anchov(?:y|ies)|whitefish|plaice)\b|(?:^|[^\p{L}])[\p{L}-]*(?:kala|lohi|seiti|seit[äa]|muikku|ahven|turska|tonnikala|silakka|silli|kuha)[\p{L}-]*)/iu;
+// Finnish "kala" can also occur inside unrelated words (e.g. kreikkalainen).
+// Match it as a word root or in common fish compounds, not at any position.
+const FISH_NAME=/(?:\b(?:fish|salmon|trout|cod|saithe|coley|pollock|herring|tuna|perch|pike|vendace|anchov(?:y|ies)|whitefish|plaice)\b|(?:^|[^\p{L}])(?:(?:kala|(?:manteli|uuni|järvi|savu|meri|pannu|valko)kala)[\p{L}-]*|[\p{L}-]*(?:lohi|seiti|seit[äa]|muikku|ahven|turska|tonnikala|silakka|silli|kuha)[\p{L}-]*))/iu;
 const CRUSTACEAN_NAME=/(?:\b(?:shrimp|prawns?|crab|lobster|crustaceans?)\b|(?:^|[^\p{L}])[\p{L}-]*(?:katkarapu|äyriäi)[\p{L}-]*)/iu;
 const MOLLUSC_NAME=/(?:\b(?:molluscs?|mussels?|oysters?|squid|octopus|scallops?)\b|(?:^|[^\p{L}])[\p{L}-]*(?:simpukka|mustekala|nilviäi)[\p{L}-]*)/iu;
 function declaredFoodText(value){

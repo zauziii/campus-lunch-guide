@@ -9,6 +9,7 @@ const COMMON_DISHES=[
   ['Shiitake and parmesan pizza, truffle oil and rucola','香菇帕尔马奶酪披萨，配松露油和芝麻菜'],
   ['Lihapullia Mac & Cheese','肉丸芝士通心粉'],
   ['Satay - Kana Bowl','沙爹鸡肉碗'],
+  ['Pollo limonello pasta','柠檬鸡肉意面'],
   ['Tuna Bowl','金枪鱼碗']
 ];
 function normalize(value){return String(value||'').normalize('NFKC').trim().replace(/\s+/g,' ').toLocaleLowerCase('en');}
