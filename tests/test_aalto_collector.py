@@ -2,6 +2,7 @@ import importlib.util
 import json
 from datetime import date
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 import unittest
 
 spec = importlib.util.spec_from_file_location('collector', Path(__file__).parents[1] / 'scripts/collect-aalto.py')
@@ -44,7 +45,7 @@ class CollectorTests(unittest.TestCase):
             if '/areas?' in url:
                 return [{'id': 1, 'restaurants': [2, 52, 84]}]
             if '/restaurants?' in url:
-                return [{'id': i, 'name': str(i), 'url': 'https://example.com/', 'openingHours': []} for i in [2, 52, 84]]
+                return [{'id': i, 'name': str(i), 'priceCategory': 'student', 'url': 'https://example.com/', 'openingHours': []} for i in [2, 52, 84]]
             if '/menus?' in url:
                 return {'2': {'2026-11-09': [{'title': 'Old title', 'properties': []}]},
                         '84': {'2026-11-09': [{'title': 'Soup', 'properties': []}]}}
@@ -65,7 +66,7 @@ class CollectorTests(unittest.TestCase):
             if '/areas?' in url:
                 return [{'id': 1, 'restaurants': [2]}]
             if '/restaurants?' in url:
-                return [{'id': 2, 'name': 'Computer Science Building', 'openingHours': []}]
+                return [{'id': 2, 'name': 'Computer Science Building', 'priceCategory': 'student', 'openingHours': []}]
             if '/menus?' in url:
                 return {'2': {'2026-11-09': [{'title': 'Chicken', 'properties': []}]}}
             raise OSError('unavailable')
@@ -81,7 +82,7 @@ class CollectorTests(unittest.TestCase):
             if '/areas?' in url:
                 return [{'id': 1, 'restaurants': [2]}]
             if '/restaurants?' in url:
-                return [{'id': 2, 'name': 'Computer Science Building', 'openingHours': []}]
+                return [{'id': 2, 'name': 'Computer Science Building', 'priceCategory': 'student', 'openingHours': []}]
             if '/menus?' in url:
                 return {'2': {'2026-11-09': [{'title': 'Chicken soup', 'properties': []}]}}
             raise OSError('unavailable')
@@ -90,6 +91,57 @@ class CollectorTests(unittest.TestCase):
         menu = result['restaurants'][0]['menus']['2026-11-09']
         self.assertEqual(menu['source'], 'kanttiinit')
         self.assertEqual(menu['dishes'][0]['name'], 'Chicken soup')
+
+    def test_only_student_lunch_restaurants_are_requested_and_collected(self):
+        requested_menus, requested_official = [], []
+        def fetch_json(url):
+            if '/areas?' in url:
+                return [{'id': 1, 'restaurants': [2, 52, 59, 84]}]
+            if '/restaurants?' in url:
+                return [{'id': 2, 'name': 'Computer Science Building', 'priceCategory': 'student'},
+                        {'id': 52, 'name': 'A Bloc', 'priceCategory': 'student'},
+                        {'id': 59, 'name': 'Arvo', 'priceCategory': 'studentPremium'},
+                        {'id': 84, 'name': 'Menssa', 'priceCategory': 'regular'}]
+            if '/menus?' in url:
+                requested_menus.extend(parse_qs(urlsplit(url).query)['restaurants'][0].split(','))
+                return {'2': {'2026-11-09': [{'title': 'Chicken', 'properties': []}]}}
+            if 'compass-group.fi' in url:
+                return {'MenusForDays': []}
+            raise AssertionError(url)
+        def fetch_html(url):
+            requested_official.append(url)
+            return HTML
+        result = collector.collect(today=date(2026, 11, 7), json_fetch=fetch_json, html_fetch=fetch_html)
+        self.assertEqual([r['id'] for r in result['restaurants']], [2, 52])
+        self.assertTrue(all(r['priceCategory'] == 'student' for r in result['restaurants']))
+        self.assertEqual(requested_menus, ['2', '52'])
+        self.assertEqual(requested_official, [collector.SODEXO[2]])
+        self.assertFalse(result['partial'])
+
+    def test_missing_price_category_is_not_included_and_marks_results_partial(self):
+        def fetch_json(url):
+            if '/areas?' in url:
+                return [{'id': 1, 'restaurants': [2, 84, 99]}]
+            if '/restaurants?' in url:
+                return [{'id': 2, 'name': 'Student restaurant', 'priceCategory': 'student'},
+                        {'id': 84, 'name': 'Unknown restaurant'}]
+            if '/menus?' in url:
+                return {'2': {'2026-11-09': [{'title': 'Chicken'}]}}
+            raise OSError('unavailable')
+        result = collector.collect(today=date(2026, 11, 7), json_fetch=fetch_json, html_fetch=lambda _: HTML)
+        self.assertEqual([r['id'] for r in result['restaurants']], [2])
+        self.assertTrue(result['partial'])
+
+    def test_no_student_restaurants_does_not_request_every_restaurant_menu(self):
+        def fetch_json(url):
+            if '/areas?' in url:
+                return [{'id': 1, 'restaurants': [84]}]
+            if '/restaurants?' in url:
+                return [{'id': 84, 'priceCategory': 'studentPremium'}]
+            raise AssertionError('no menu request should be made')
+        result = collector.collect(today=date(2026, 11, 7), json_fetch=fetch_json)
+        self.assertEqual(result['restaurants'], [])
+        self.assertFalse(result['partial'])
 
     def test_missing_date_or_year_does_not_misassign(self):
         self.assertIsNone(collector.day_from_label('Previous Week', date(2026, 11, 7)))

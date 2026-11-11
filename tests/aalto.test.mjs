@@ -41,7 +41,7 @@ test('does not identify vegan dishes, carrots or meat stock as meat',()=>{
 });
 
 test('uses the correct restaurant link and day and respects official lunch hours',()=>{
-  const source={restaurants:[{id:52,name:'A Bloc',url:'https://www.compass-group.fi/restaurant/a-bloc/',address:'Otaniementie 12',weeklyHours:[],sourceAvailable:true,menus:{'2026-11-07':{
+  const source={restaurants:[{id:52,name:'A Bloc',priceCategory:'student',url:'https://www.compass-group.fi/restaurant/a-bloc/',address:'Otaniementie 12',weeklyHours:[],sourceAvailable:true,menus:{'2026-11-07':{
     lunchHours:{start:660,end:960},dishes:[{name:'Crispy chicken',source:'compass'}]
   }}}]};
   const [record]=buildAaltoRecords(source,'2026-11-07');
@@ -53,6 +53,17 @@ test('uses the correct restaurant link and day and respects official lunch hours
   assert.equal(buildAaltoRecords(source,'2026-11-08')[0].dishes.length,0);
 });
 
+test('only student lunch restaurants are displayed, including when an old snapshot is used',()=>{
+  const restaurants=[
+    {id:1,name:'Kvarkki',priceCategory:'student'},
+    {id:41,name:'Mau-kas',priceCategory:'studentPremium'},
+    {id:100,name:'Regular price',priceCategory:'regular'},
+    {id:101,name:'Old snapshot without category'},
+    {id:102,name:'Unknown category',priceCategory:'newCategory'}
+  ];
+  assert.deepEqual(buildAaltoRecords({restaurants},'2026-11-07').map(r=>r.name),['Kvarkki']);
+});
+
 test('queues relevant Aalto titles in Finnish or English for translation',()=>{
   const data={restaurants:[{menus:{'2026-11-09':{dishes:[
     {name:'Chicken and rice'}, {name:'Chicken and rice'},
@@ -60,4 +71,16 @@ test('queues relevant Aalto titles in Finnish or English for translation',()=>{
     {name:'Saithe in pesto sauce'}
   ]}}}]};
   assert.deepEqual(collectAaltoDishNames(data),['Chicken and rice','Seitä pestokastikkeessa']);
+});
+
+test('queues only student restaurant names for Aalto, even from an older mixed snapshot',()=>{
+  const dish=name=>({menus:{'2026-11-09':{dishes:[{name}]}}});
+  const data={restaurants:[
+    {...dish('Chicken'),priceCategory:'student'},
+    {...dish('Pork'),priceCategory:'studentPremium'},
+    {...dish('Salmon')}
+  ]};
+  assert.deepEqual(collectAaltoDishNames(data,{studentOnly:true}),['Chicken']);
+  // The same helper also processes Laurus, whose data has no price category.
+  assert.deepEqual(collectAaltoDishNames({restaurants:[dish('Salmon')]}),['Salmon']);
 });

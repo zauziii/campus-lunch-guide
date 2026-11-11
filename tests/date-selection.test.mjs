@@ -15,7 +15,7 @@ test('selects calendar dates from Helsinki time across year, leap day and daylig
 });
 
 test('a future published menu is not hidden by the current time while today is unchanged',()=>{
-  const snapshot={restaurants:[{id:1,name:'Example',weeklyHours:[],menus:{'2026-11-09':{
+  const snapshot={restaurants:[{id:1,name:'Example',priceCategory:'student',weeklyHours:[],menus:{'2026-11-09':{
     lunchHours:{start:630,end:870},dishes:[{name:'Chicken curry'}]
   }}}]};
   const [tomorrow]=buildAaltoRecords(snapshot,'2026-11-09');

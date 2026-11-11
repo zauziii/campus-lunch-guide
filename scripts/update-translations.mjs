@@ -32,9 +32,10 @@ export function collectDishNames(restaurants){
   return [...names];
 }
 
-export function collectAaltoDishNames(snapshot){
+export function collectAaltoDishNames(snapshot,{studentOnly=false}={}){
   const names=new Set();
   for(const restaurant of Array.isArray(snapshot?.restaurants)?snapshot.restaurants:[]){
+    if(studentOnly&&restaurant?.priceCategory!=='student')continue;
     for(const day of Object.values(restaurant?.menus||{}))for(const dish of Array.isArray(day?.dishes)?day.dishes:[]){
       const name=typeof dish?.name==='string'?dish.name.trim():'';
       if(!name||localDishTranslation(name))continue;
@@ -68,7 +69,7 @@ export function makeBatches(names){
 export async function buildCache({restaurants,previous,aalto,laurus,key,region='northeurope',fetchImpl=fetch,now=new Date()}){
   if(typeof key!=='string'||!key.trim())throw new Error('Missing AZURE_TRANSLATOR_KEY. Add it to the repository Actions secrets.');
   if(typeof region!=='string'||!region.trim())throw new Error('Missing Azure Translator region.');
-  const translations=cleanCache(previous),names=[...new Set([...collectDishNames(restaurants),...collectAaltoDishNames(aalto),...collectAaltoDishNames(laurus)])];
+  const translations=cleanCache(previous),names=[...new Set([...collectDishNames(restaurants),...collectAaltoDishNames(aalto,{studentOnly:true}),...collectAaltoDishNames(laurus)])];
   const pending=names.filter(name=>!Object.hasOwn(translations,name));
   const {batches,skipped}=makeBatches(pending);let added=0,untranslated=skipped;
   for(const batch of batches){

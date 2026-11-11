@@ -38,6 +38,7 @@ OFFICIAL_URLS = {
 }
 SODEXO = {key: OFFICIAL_URLS[key] for key in (1, 2, 59)}
 COMPASS = {5: '0190', 7: '0199', 45: '3101', 52: '3087'}
+PRICE_CATEGORIES = {'student', 'studentPremium', 'regular'}
 
 
 def download(url):
@@ -245,19 +246,26 @@ def collect(today=None, json_fetch=load_json, html_fetch=download):
     meta = json_fetch(f'{KITCHEN}/restaurants?' + urlencode({'lang': 'en', 'ids': ','.join(map(str, ids))}))
     if not isinstance(meta, list):
         raise ValueError('Restaurant metadata is unavailable')
+    # Kanttiinit's price category belongs to the restaurant, not to an
+    # individual dish. Only request menus for restaurants marked student lunch.
+    meta_by_id = {item['id']: item for item in meta
+                  if isinstance(item, dict) and item.get('id') in ids}
+    metadata_incomplete = any(rid not in meta_by_id or meta_by_id[rid].get('priceCategory') not in PRICE_CATEGORIES
+                              for rid in ids)
+    student_ids = [rid for rid in ids if rid in meta_by_id and meta_by_id[rid].get('priceCategory') == 'student']
     days = [(today + timedelta(days=i)).isoformat() for i in range(8)]
     menu_error = False
-    try:
-        menus = json_fetch(f'{KITCHEN}/menus?' + urlencode({'lang': 'en', 'restaurants': ','.join(map(str, ids)), 'days': ','.join(days)}))
-        if not isinstance(menus, dict):
-            raise ValueError('Unexpected menu data')
-    except Exception:
-        menus, menu_error = {}, True
+    menus = {}
+    if student_ids:
+        try:
+            menus = json_fetch(f'{KITCHEN}/menus?' + urlencode({'lang': 'en', 'restaurants': ','.join(map(str, student_ids)), 'days': ','.join(days)}))
+            if not isinstance(menus, dict):
+                raise ValueError('Unexpected menu data')
+        except Exception:
+            menus, menu_error = {}, True
     records = {}
-    for restaurant in meta:
-        rid = restaurant.get('id')
-        if rid not in ids:
-            continue
+    for rid in student_ids:
+        restaurant = meta_by_id[rid]
         url = OFFICIAL_URLS.get(rid) or str(restaurant.get('url') or '')
         if not url.startswith('https://'):
             url = ''
@@ -265,7 +273,7 @@ def collect(today=None, json_fetch=load_json, html_fetch=download):
         fallback = {day: {'dishes': parse_kanttiinit(courses), 'lunchHours': None, 'source': 'kanttiinit'}
                     for day, courses in stored.items() if day in days}
         hours = restaurant.get('openingHours') if isinstance(restaurant.get('openingHours'), list) else []
-        records[rid] = {'id': rid, 'name': str(restaurant.get('name') or ''), 'url': url,
+        records[rid] = {'id': rid, 'name': str(restaurant.get('name') or ''), 'priceCategory': 'student', 'url': url,
                         'address': str(restaurant.get('address') or ''), 'weeklyHours': hours,
                         'sourceAvailable': not menu_error, 'menus': fallback}
     def official_job(kind, value):
@@ -293,7 +301,7 @@ def collect(today=None, json_fetch=load_json, html_fetch=download):
                 pass
     return {'version': 1, 'collectedAt': datetime.now(timezone.utc).isoformat(),
             'area': 'Otaniemi', 'restaurants': list(records.values()),
-            'partial': menu_error or len(records) != len(ids)}
+            'partial': menu_error or metadata_incomplete}
 
 
 def collect_laurus(today=None, json_fetch=load_json, html_fetch=download):

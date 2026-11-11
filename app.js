@@ -1,4 +1,4 @@
-import {CAMPUS_NAMES,todayParts,shiftDateParts,helsinkiMinutes,formatLunchHours,shouldDisplayRestaurant,emptyMenuState,officialRestaurantUrl,buildRecords,buildAaltoRecords,buildLaurusRecords} from './menu.mjs?v=20261111f';
+import {CAMPUS_NAMES,todayParts,shiftDateParts,helsinkiMinutes,formatLunchHours,shouldDisplayRestaurant,emptyMenuState,officialRestaurantUrl,buildRecords,buildAaltoRecords,buildLaurusRecords} from './menu.mjs?v=20261111g';
 import {dishTranslation} from './translation.mjs?v=20261111b';
 const API='https://unicafe.fi/wp-json/swiss/v1/restaurants';
 const content=document.querySelector('#content'), status=document.querySelector('#status'), dateNode=document.querySelector('#today'), refreshButton=document.querySelector('#refresh');
@@ -141,7 +141,7 @@ async function load(){
   currentDate=today.iso;sourceWarning='';sourceIncomplete=false;
   document.querySelector('#heading-day').textContent=day;
   document.title=`吃好饭 | ${day}哪里有肉和鱼？`;
-  document.querySelector('#list-note').textContent=offset===0?'已隐藏时段结束或未找到相关菜品的食堂':'仅显示已公布且有相关菜品的食堂';
+  document.querySelector('#list-note').textContent=school==='aalto'?'仅显示学生餐餐厅':offset===0?'已隐藏时段结束或未找到相关菜品的食堂':'仅显示已公布且有相关菜品的食堂';
   dateNode.textContent=new Intl.DateTimeFormat('zh-CN',{timeZone:'Europe/Helsinki',month:'long',day:'numeric',weekday:'long'}).format(new Date(`${selected.iso}T12:00:00Z`));
   setStatus(school==='aalto'?'正在读取已发布菜单…':'正在获取官方菜单…');refreshButton.disabled=true;
   content.innerHTML=`<div class="state"><div class="spinner"></div><h3>正在查看${day}的菜单</h3><p>正在获取菜单信息…</p></div>`;
@@ -172,10 +172,12 @@ async function load(){
       setStatus(en?`UniCafe 获取 ${time}`:'主楼菜单已读取',Boolean(en));
     }else{
       const snapshot=prepared?.aalto;
-      if(!snapshot?.collectedAt||!Array.isArray(snapshot.restaurants)||!snapshot.restaurants.length)throw Error('aalto');
+      if(!snapshot?.collectedAt||!Array.isArray(snapshot.restaurants))throw Error('aalto');
       records=buildAaltoRecords(snapshot,selected.iso);
-      if(snapshot.refreshFailed){sourceWarning='最近一次菜单更新未成功，当前显示上次的数据。';sourceIncomplete=true;}
-      else if(snapshot.partial||records.some(r=>!r.sourceAvailable)){sourceWarning='部分餐厅菜单暂时无法获取，结果可能不完整。';sourceIncomplete=true;}
+      const unclassified=snapshot.restaurants.some(r=>!['student','studentPremium','regular'].includes(r?.priceCategory));
+      if(snapshot.refreshFailed&&unclassified){sourceWarning='最近一次更新未成功，旧数据的学生餐分类无法确认。';sourceIncomplete=true;}
+      else if(snapshot.refreshFailed){sourceWarning='最近一次菜单更新未成功，当前显示上次的数据。';sourceIncomplete=true;}
+      else if(snapshot.partial||unclassified||records.some(r=>!r.sourceAvailable)){sourceWarning='部分餐厅分类或菜单暂时无法确认，结果可能不完整。';sourceIncomplete=true;}
       else if(records.some(r=>!r.hasMenu))sourceWarning=`部分餐厅${day}暂无菜单，结果可能不完整。`;
       const date=new Date(snapshot.collectedAt);
       const time=Number.isNaN(date.getTime())?'时间未知':new Intl.DateTimeFormat('zh-CN',{timeZone:'Europe/Helsinki',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}).format(date);
@@ -197,7 +199,7 @@ function selectUniversity(next){
   document.querySelector('#fish-legend').textContent='鱼 / 海鲜：识别到';
   document.querySelector('#footer-source').textContent=next==='aalto'?'非官方独立项目 · 数据来源 Kanttiinit 与餐厅官网':'非官方独立项目 · 数据来源 UniCafe / Sodexo';
   document.querySelector('#notice-details').textContent=next==='aalto'
-    ?'部分餐厅提供食材或过敏原信息，其余依据菜名识别；配料可能属于酱汁或不同选项，同一餐厅可能同时计入肉类和鱼类。Aalto 菜单通常每日定时采集，“重新加载”只读取已发布的数据。营业和供应信息请核对餐厅官网。'
+    ?'仅收录 Kanttiinit 标为学生餐的餐厅，具体菜品和价格以餐厅官网为准。部分餐厅提供食材或过敏原信息，其余依据菜名识别；配料可能属于酱汁或不同选项，同一餐厅可能同时计入肉类和鱼类。Aalto 菜单通常每日定时采集，“重新加载”只读取已发布的数据。营业和供应信息请核对餐厅官网。'
     :'肉类和鱼类依据菜名、配料或官方过敏原识别，可能遗漏或误判；同一餐厅可能同时计入肉类和鱼类。UniCafe 菜单实时获取；主楼菜单每日采集，刷新只会重新读取已发布的数据。详情请查看餐厅官网。';
   const refreshIcon=el('span','','↻');refreshIcon.setAttribute('aria-hidden','true');
   refreshButton.replaceChildren(refreshIcon,document.createTextNode(next==='aalto'?' 重新加载':' 刷新'));

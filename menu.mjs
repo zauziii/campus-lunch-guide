@@ -320,7 +320,9 @@ function buildExternalRecords(snapshot,iso,campus,prefix,onlyId=null){
 }
 
 export function buildAaltoRecords(snapshot,iso=todayParts().iso){
-  return buildExternalRecords(snapshot,iso,'Otaniemi','aalto');
+  if(!snapshot||!Array.isArray(snapshot.restaurants))return [];
+  // Also filter old cached snapshots, which can predate the collector rule.
+  return buildExternalRecords({...snapshot,restaurants:snapshot.restaurants.filter(r=>r?.priceCategory==='student')},iso,'Otaniemi','aalto');
 }
 
 export function buildLaurusRecords(snapshot,iso=todayParts().iso,cityCampus='City Centre'){
