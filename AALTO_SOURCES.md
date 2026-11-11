@@ -17,6 +17,6 @@
 | Mau-kas Nova | [Mau-kas Nova](https://www.mau-kas.fi/nova) |
 | Menssa | [Menssa 午餐](https://menssa.fi/lounas/) |
 
-Sodexo 的部分菜品会公开食材、配方组成或过敏原信息；Compass Group 的菜单目前可取得菜名和饮食标记。其他餐厅以 Kanttiinit 提供的菜单为备用来源。不是所有餐厅都提供完整配料表，所以网站会区分“食材信息”和“菜名识别”；无法判断的菜品标为“待确认”。
+Sodexo 的部分菜品会公开食材、配方组成或过敏原信息；Compass Group 的菜单目前可取得菜名和饮食标记。其他餐厅以 Kanttiinit 提供的菜单为备用来源。不是所有餐厅都提供完整配料表，所以网站会区分“食材信息”、“配方信息”和“菜名识别”；无法判断的菜品标为“待确认”。
 
 Aalto 数据由现有 GitHub Actions 在发布时采集，网页上的“刷新”只会重新读取已发布的数据，不会立即重新采集所有餐厅。请以采集时间和各餐厅官网为准。

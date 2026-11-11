@@ -36,7 +36,7 @@ test('uses Sodexo allergens and recipe components to identify fish, seafood and 
   assert.equal(dishes[0].fishEvidence,'官方过敏原');
   assert.equal(dishes[1].marks.containsCrustaceans,true);
   assert.equal(dishes[2].meat.animal,'鸡肉');
-  assert.equal(dishes[2].meat.source,'食材信息');
+  assert.equal(dishes[2].meat.source,'菜名');
   assert.equal(dishes[3].meat.status,'excluded');
   assert.equal(dishes[3].fish,false);
 });
@@ -44,7 +44,16 @@ test('uses Sodexo allergens and recipe components to identify fish, seafood and 
 test('recognizes coley and pollo in dish names without labelling vegan pollo as meat',()=>{
   assert.equal(classifyAaltoDish({name:'Fried coley'}).fishEvidence,'菜名');
   assert.equal(buildLaurusRecords(snapshot,'2026-11-12')[0].dishes[0].meat.animal,'鸡肉');
+  assert.equal(buildLaurusRecords(snapshot,'2026-11-12')[0].dishes[0].meat.source,'菜名');
   assert.notEqual(classifyAaltoDish({name:'Vegan pollo pasta',properties:['VV']}).meat.status,'identified');
+});
+
+test('distinguishes actual ingredients from recipe titles and dish names',()=>{
+  assert.equal(classifyAaltoDish({name:'House special',ingredients:['broiler']}).meat.source,'食材信息');
+  assert.equal(classifyAaltoDish({name:'House special',components:['broiler']}).meat.source,'配方信息');
+  assert.equal(classifyAaltoDish({name:'House special',components:['Paistettua seitiä']}).fishEvidence,'配方信息');
+  assert.equal(classifyAaltoDish({name:'House special',ingredients:['seiti']}).fishEvidence,'食材信息');
+  assert.equal(classifyAaltoDish({name:'Fish soup',components:['Kalakeitto']}).fishEvidence,'菜名');
 });
 
 test('does not mistake Finnish nationality words for fish but recognizes actual fish compounds',()=>{

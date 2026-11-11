@@ -243,23 +243,31 @@ export function classifyAaltoDish(item){
   const name=String(item?.name||'').trim(),category=String(item?.category||'');
   const properties=foodProperties(item),vegetarian=properties.some(x=>['vv','veg','vegan','vegetarian'].includes(x))
     ||/(?:\bvegan\b|\bvegetarian\b|veg(etaar|aan|aaninen)|kasvislounas|kasviskeitto)/iu.test(`${category} ${name}`);
-  const info=[...(Array.isArray(item?.components)?item.components:[]),...(Array.isArray(item?.ingredients)?item.ingredients:[])].join(' ');
+  const components=declaredFoodText((Array.isArray(item?.components)?item.components:[]).join(' '));
+  const ingredients=declaredFoodText((Array.isArray(item?.ingredients)?item.ingredients:[]).join(' '));
   const declared=[...(Array.isArray(item?.allergens)?item.allergens:[])].map(declaredFoodText).join(' ');
-  const sourceText=declaredFoodText(info),titleText=declaredFoodText(name);
+  const sourceText=`${components} ${ingredients}`,titleText=declaredFoodText(name);
   const marks={containsFish:FISH_NAME.test(declared),containsCrustaceans:CRUSTACEAN_NAME.test(declared),containsMolluscs:MOLLUSC_NAME.test(declared)};
   const fishInSource=FISH_NAME.test(sourceText),crustaceanInSource=CRUSTACEAN_NAME.test(sourceText),molluscInSource=MOLLUSC_NAME.test(sourceText);
   const fishInTitle=FISH_NAME.test(titleText),crustaceanInTitle=CRUSTACEAN_NAME.test(titleText),molluscInTitle=MOLLUSC_NAME.test(titleText);
-  const sourceMeat=detectMeat({name:'',ingredients:sourceText,meta:{},price:{}});
+  const ingredientMeat=detectMeat({name:'',ingredients,meta:{},price:{}});
+  const componentMeat=detectMeat({name:'',ingredients:components,meta:{},price:{}});
   const titleMeat=detectMeat({name:titleText,ingredients:'',meta:{},price:{}});
   if(vegetarian||/(?:dessert|jälkiruoka|jalkiruoka)/iu.test(category)){
     return {original:name,meat:{status:'excluded',reason:'官方素食或甜点标记'},fish:false,marks:{containsFish:false,containsCrustaceans:false,containsMolluscs:false},source:item?.source};
   }
-  let meat=sourceMeat.status==='identified'?{...sourceMeat,source:'食材信息'}:titleMeat.status==='identified'?{...titleMeat,source:'菜名'}:{status:'uncertain',reason:'信息不足'};
+  let meat;
+  if(ingredientMeat.status==='identified')meat={...ingredientMeat,source:'食材信息'};
+  else if(componentMeat.status==='identified'){
+    meat=titleMeat.status==='identified'&&titleMeat.animal===componentMeat.animal
+      ?{...titleMeat,source:'菜名'}:{...componentMeat,source:'配方信息'};
+  }else meat=titleMeat.status==='identified'?{...titleMeat,source:'菜名'}:{status:'uncertain',reason:'信息不足'};
   const officialFish=marks.containsFish||marks.containsCrustaceans||marks.containsMolluscs;
   const sourceFish=fishInSource||crustaceanInSource||molluscInSource;
   const titleFish=fishInTitle||crustaceanInTitle||molluscInTitle;
   const fish=officialFish||sourceFish||titleFish;
-  const fishEvidence=officialFish?'官方过敏原':sourceFish?'食材信息':titleFish?'菜名':'';
+  const ingredientFish=FISH_NAME.test(ingredients)||CRUSTACEAN_NAME.test(ingredients)||MOLLUSC_NAME.test(ingredients);
+  const fishEvidence=officialFish?'官方过敏原':ingredientFish?'食材信息':titleFish?'菜名':sourceFish?'配方信息':'';
   if(fish&&meat.status==='uncertain')meat={status:'excluded',reason:'已识别为鱼或海鲜'};
   return {original:name,meat,fish,fishEvidence,source:item?.source,marks:{
     containsFish:marks.containsFish||fishInSource||fishInTitle,

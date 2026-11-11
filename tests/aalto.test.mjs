@@ -7,7 +7,7 @@ test('uses official recipe components before the dish name for meat evidence',()
   const d=classifyAaltoDish({name:'House special',components:['Porsaanlihasuikaleita'],source:'sodexo'});
   assert.equal(d.meat.status,'identified');
   assert.equal(d.meat.animal,'猪肉');
-  assert.equal(d.meat.source,'食材信息');
+  assert.equal(d.meat.source,'配方信息');
 });
 
 test('distinguishes fish allergens, title evidence and uncertain dishes',()=>{

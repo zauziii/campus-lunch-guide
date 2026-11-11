@@ -1,4 +1,4 @@
-import {CAMPUS_NAMES,todayParts,shiftDateParts,helsinkiMinutes,formatLunchHours,shouldDisplayRestaurant,emptyMenuState,officialRestaurantUrl,buildRecords,buildAaltoRecords,buildLaurusRecords} from './menu.mjs?v=20261111b';
+import {CAMPUS_NAMES,todayParts,shiftDateParts,helsinkiMinutes,formatLunchHours,shouldDisplayRestaurant,emptyMenuState,officialRestaurantUrl,buildRecords,buildAaltoRecords,buildLaurusRecords} from './menu.mjs?v=20261111c';
 import {dishTranslation} from './translation.mjs?v=20261111b';
 const API='https://unicafe.fi/wp-json/swiss/v1/restaurants';
 const content=document.querySelector('#content'), status=document.querySelector('#status'), dateNode=document.querySelector('#today'), refreshButton=document.querySelector('#refresh');
@@ -40,12 +40,13 @@ function renderDish(dish, kind, restaurant){
   const external=restaurant.provider==='external';
   const item=el('li','dish'),title=el('span','dish-name',translated||dish.original);item.append(title);
   if(kind==='meat' && dish.meat.status==='identified'){
-    const evidence=external?`${dish.meat.source==='食材信息'?'食材信息':'菜名识别'} · ${dish.meat.animal}`:dish.meat.source==='菜名'?dish.meat.animal:`配料含肉（${dish.meat.animal}）`;
+    const origin=dish.meat.source==='食材信息'?'食材信息':dish.meat.source==='配方信息'?'配方信息':'菜名识别';
+    const evidence=external?`${origin} · ${dish.meat.animal}`:dish.meat.source==='菜名'?dish.meat.animal:`配料含肉（${dish.meat.animal}）`;
     item.append(el('span','evidence',evidence));
   }
   if(kind==='fish'){
     const labels=[];if(dish.marks.containsFish)labels.push('鱼');if(dish.marks.containsCrustaceans)labels.push('甲壳类');if(dish.marks.containsMolluscs)labels.push('贝类');
-    const basis=external?(dish.fishEvidence==='菜名'?'菜名识别':dish.fishEvidence==='食材信息'?'食材信息':'官方过敏原'):'官方标记';
+    const basis=external?(dish.fishEvidence==='菜名'?'菜名识别':dish.fishEvidence||'官方过敏原'):'官方标记';
     item.append(el('span','evidence',`${basis}：${labels.join(' / ')}`));
   }
   const original=el('span','original'),note=el('span','untranslated');item.append(original,note);
